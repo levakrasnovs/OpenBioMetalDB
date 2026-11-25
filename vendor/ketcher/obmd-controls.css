@@ -1,0 +1,49 @@
+/* Style the Streamlit wrapper's actions. The drawing tools have their own styles. */
+#root > div > div:last-child {
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #f6f6fb;
+  border-top: 1px solid #e0e1ef;
+}
+
+#root > div > div:last-child > button {
+  appearance: none;
+  min-height: 36px;
+  padding: 7px 16px;
+  border: 1px solid #d8daea;
+  border-radius: 9px;
+  background: #fff;
+  color: #252841;
+  font: 600 14px/1.25 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+#root > div > div:last-child > button:hover:not(:disabled) {
+  background: #ebe9ff;
+  color: #4333b7;
+  border-color: #ada4f2;
+}
+
+#root > div > div:last-child > button:last-child {
+  background: #5947d4;
+  border-color: #5947d4;
+  color: #fff;
+}
+
+#root > div > div:last-child > button:last-child:hover:not(:disabled) {
+  background: #4937bd;
+  border-color: #4937bd;
+  color: #fff;
+}
+
+#root > div > div:last-child > button:focus-visible {
+  outline: 2px solid #5947d4;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+#root > div > div:last-child > button:disabled {
+  opacity: .5;
+  cursor: default;
+}
