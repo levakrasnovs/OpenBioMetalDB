@@ -40,7 +40,7 @@ const pRef = (d, n) => {
 const cache = {};
 async function loadCompound(id) {
   if (cache[id]) return cache[id];
-  const response = await fetch(`c/${id}.json?v=35`);
+  const response = await fetch(`c/${id}.json?v=37`);
   if (!response.ok) throw new Error(`Could not load ${id}`);
   return cache[id] = await response.json();
 }
@@ -64,13 +64,13 @@ const isCellular50 = type => /^[a-z]+50$/i.test(type);
 const controlHref = comparison => `#/c/${encodeURIComponent(comparison.compound_id)}?control=${encodeURIComponent(comparison.measurement_id)}`;
 const PHOTO_LABEL = 'Photocytotoxicity';
 const PHOTO_SHORT_LABEL = 'Photo';
-const DATA_ICONS = { efficacy: '🐁', photo: '🌞', logp: '💧', ic50: '🧫', fda: '💊', approved: '💊', jp: '🇯🇵', cn: '🇨🇳', trials: '🧪' };
+const DATA_ICONS = { efficacy: '🐁', photo: '🌞', logp: '💧', ic50: '🧫', mp: '🌡️', fda: '💊', approved: '💊', jp: '🇯🇵', cn: '🇨🇳', trials: '🧪' };
 const APPROVAL_LABELS = { fda: 'FDA approved', jp: 'Approved in Japan', cn: 'Approved in China' };
 const APPROVAL_KINDS = Object.keys(APPROVAL_LABELS);
 const CLINICAL_LABELS = { ...APPROVAL_LABELS, trials: 'Clinical trials' };
 const clinicalPhaseLabel = phase => phase ? `Max phase ${esc(phase)}` : CLINICAL_LABELS.trials;
 const dataIcon = kind => DATA_ICONS[kind] ? `<span aria-hidden="true">${DATA_ICONS[kind]}</span> ` : '';
-const SECTION_DATA_KIND = { ic: 'ic50', photo: 'photo', iv: 'efficacy', lp: 'logp' };
+const SECTION_DATA_KIND = { ic: 'ic50', photo: 'photo', iv: 'efficacy', lp: 'logp', mp: 'mp' };
 const sectionIcon = id => dataIcon(SECTION_DATA_KIND[id]);
 const IV = ['efficacy', 'toxicity', 'pk', 'survival', 'organs', 'biodist', 'biomarkers'];
 const hasIV = c => IV.some(k => c.k[k]);
@@ -98,6 +98,7 @@ function card(c, o = {}) {
   if (c.k.pk) s.push('<span class="ms iv">PK</span>');
   if (c.ld50_mtd) s.push(`<span class="ms iv">${KIND.toxicity}</span>`);
   if (c.k.logp) s.push(`<span class="ms lp">${dataIcon('logp')}logP</span>`);
+  if (c.k.mp) s.push(`<span class="ms" title="Melting Point">${dataIcon('mp')}MP</span>`);
   return `<a class="card" href="#/c/${c.id}">${img(c.id, label(c))}<div class="meta"><div class="oid">${c.id} · ${esc(c.m)}</div>
     <div class="nm" title="${esc(c.n.join(', '))}">${esc(label(c))}</div><div class="mini-stats">${s.join('')}<span class="ms">${c.p} paper${c.p > 1 ? 's' : ''}</span></div></div></a>`;
 }
@@ -106,7 +107,7 @@ function card(c, o = {}) {
 const canonicalPaperDoi = doi => IDX.paper_aliases?.[doi.toLowerCase()] ?? doi;
 async function route() {
   hideTip();
-  if (!IDX) { IDX = await fetch('index.json?v=22').then(r => r.json()); IDX.compounds.forEach(c => BY[c.id] = c); PM = await fetch('paper_meta.json').then(r => r.json()).catch(() => ({})); }
+  if (!IDX) { IDX = await fetch('index.json?v=24').then(r => r.json()); IDX.compounds.forEach(c => BY[c.id] = c); PM = await fetch('paper_meta.json').then(r => r.json()).catch(() => ({})); }
   const h = location.hash.slice(1) || '/';
   const [encodedPath, qs] = h.split('?'); const path = decodeURIComponent(encodedPath); const q = new URLSearchParams(qs || '');
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + h));
@@ -277,7 +278,9 @@ async function structureSearch(smi, mode, thr) {
 const EXAMPLES = [['p-cymene · Cl⁻', 'Cc1ccc(C(C)C)cc1.[Cl-]'], ['ppy', '[c-]1ccccc1-c1ccccn1'], ['bpy', 'c1ccc(-c2ccccn2)nc1'], ['PPh3', 'c1ccc(P(c2ccccc2)c2ccccc2)cc1'],
 ['phen · phen', 'c1cnc2c(c1)ccc1cccnc12.c1cnc2c(c1)ccc1cccnc12'], ['Cp', 'c1cc[cH-]c1'], ['dfppy', 'Fc1c[c-]c(-c2ccccn2)c(F)c1']];
 const MODES = [['full', 'Full molecule match'], ['scaffold', 'Scaffold-based'], ['sub', 'Substructure'], ['sim', 'Similarity']];
-const FILTER_KIND = { ...KIND, efficacy: 'in vivo', ic50: 'IC₅₀', photo: PHOTO_SHORT_LABEL };
+const FILTER_KIND = { ...KIND, efficacy: 'in vivo', ic50: 'IC₅₀', photo: PHOTO_SHORT_LABEL, mp: 'MP' };
+const FILTER_DATA_ORDER = [...COMPOUND_DATA_ORDER, 'mp'];
+const FILTER_TITLES = { ic50: 'Includes all cellular endpoints with a 50 index', mp: 'Melting Point' };
 const CLINICAL_FILTERS = { approved: 'Approved', trials: CLINICAL_LABELS.trials };
 const CS = { smi: '', mode: 'full', thr: .7, res: null };   // structure search state survives navigation
 function catalog(q) {
@@ -316,7 +319,7 @@ function catalog(q) {
       <p class="flab">Metal</p>
       <div class="chips" id="mchips">${['All', ...topM].map(m => `<button class="chip ${m === st.metal ? 'on' : ''}" data-m="${m}">${m}</button>`).join('')}</div>
       <p class="flab">Has data</p>
-      <div class="chips has" id="hchips">${COMPOUND_DATA_ORDER.map(k => `<button class="chip ${st.has.has(k) ? 'on' : ''}" data-k="${k}" aria-pressed="${st.has.has(k)}"${k === 'ic50' ? ' title="Includes all cellular endpoints with a 50 index"' : ''}>+ ${esc(FILTER_KIND[k])}</button>`).join('')}</div>
+      <div class="chips has" id="hchips">${FILTER_DATA_ORDER.map(k => `<button class="chip ${st.has.has(k) ? 'on' : ''}" data-k="${k}" aria-pressed="${st.has.has(k)}"${FILTER_TITLES[k] ? ` title="${FILTER_TITLES[k]}"` : ''}>+ ${esc(FILTER_KIND[k])}</button>`).join('')}</div>
       <p class="flab" id="clinicalFilterLabel">Clinical status</p>
       <div class="chips has" id="clinicalFilters" role="group" aria-labelledby="clinicalFilterLabel">${Object.entries(CLINICAL_FILTERS).map(([k, name]) => `<button type="button" class="chip ${st.has.has(k) ? 'on' : ''}" data-k="${k}" aria-pressed="${st.has.has(k)}"${k === 'approved' ? ' title="Approved in any country"' : ''}>${dataIcon(k)}${name}</button>`).join('')}</div>
       <p class="flab">Cytotoxicity</p>
@@ -470,10 +473,13 @@ function showPaperData(container, compounds, source, incomplete) {
       .filter(r => String(r.DOI ?? r.doi ?? '').toLowerCase() === doiKey)
       .map(r => ({ ...r, paperCompound: { id: c.id, name: label(c) } }))]));
     const name = Object.values(rows).flat().find(r => r.Abbreviation_in_the_article || r.abbreviation_in_the_article);
-    return [c.id, { rows, name: name ? studyName(name) : label(c) }];
+    const meltingPoints = (c.melting_points ?? [])
+      .filter(row => row.source && canonicalPaperDoi(row.source.trim().toLowerCase()) === doiKey)
+      .map(row => ({ ...row, paperCompound: { id: c.id, name: label(c) } }));
+    return [c.id, { rows, meltingPoints, name: name ? studyName(name) : label(c) }];
   }));
   for (const [id, c] of byId) {
-    if (!Object.values(c.rows).some(rows => rows.length)) byId.delete(id);
+    if (!c.meltingPoints.length && !Object.values(c.rows).some(rows => rows.length)) byId.delete(id);
   }
   const state = incomplete ? '<p role="status">Some compound data could not be loaded.</p>' : '';
   container.innerHTML = state + (byId.size ? `<h3 class="paper-data-heading">Study data</h3>
@@ -489,7 +495,10 @@ function showPaperData(container, compounds, source, incomplete) {
     const selection = picker?.value ? [byId.get(picker.value)] : [...byId.values()];
     const rows = Object.fromEntries(Object.keys(KIND).map(k => [k, selection.flatMap(c => c.rows[k])]));
     const data = studyData(rows);
-    target.innerHTML = studyNavigation(data.sections) + studySectionMarkup(data);
+    const meltingPoints = selection.flatMap(c => c.meltingPoints);
+    if (meltingPoints.length) data.sections.push(['mp', 'Melting Point']);
+    target.innerHTML = studyNavigation(data.sections) + studySectionMarkup(data)
+      + (meltingPoints.length ? meltingPointSection(meltingPoints, true) : '');
     bindSectionNavigation(target);
     fillStudySections(data);
   };
@@ -612,6 +621,24 @@ function ionFormula(formula) {
   return `${atoms}<sup>${magnitude === '1' ? '' : magnitude}${sign === '-' ? '−' : '+'}</sup>`;
 }
 
+function meltingPointSection(rows, onPaper = false) {
+  return `<section class="sec" id="mp">
+    <h2>${sectionIcon('mp')}Melting Point</h2>
+    <div class="dtab mp-table">
+      <table>
+        <thead><tr>${onPaper ? '<th scope="col">Compound</th>' : ''}<th scope="col">Temperature, °C</th><th scope="col">Reported event</th><th scope="col">Counterion</th><th scope="col">Source</th></tr></thead>
+        <tbody>${rows.map(row => `<tr>
+          ${onPaper ? `<td>${studyNameCell(row)}</td>` : ''}
+          <td>${esc(row.temperature_c)}</td>
+          <td>${esc(row.event)}</td>
+          <td>${esc(row.Counterion || '–')}</td>
+          <td>${row.source ? (onPaper ? esc(row.source) : doi(row.source.trim().toLowerCase())) : row.url ? `<a href="${esc(row.url)}" target="_blank" rel="noopener">${esc(row.notes || 'Supplier datasheet')}</a>` : '–'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </section>`;
+}
+
 function clinicalDetails({ fda, drugbank, trials, max_phase, regional_approvals = {} }) {
   return `<dt>Clinical status</dt><dd class="clinical-status">
     ${fda ? `<div><a class="ms clinical-fda" href="${esc(fda.url)}" target="_blank" rel="noopener">${dataIcon('fda')}${CLINICAL_LABELS.fda} · ${esc(fda.year)}</a>
@@ -629,7 +656,7 @@ function clinicalDetails({ fda, drugbank, trials, max_phase, regional_approvals 
         <span>${esc(['Phase ' + t.phase, t.completion_year ? `Completed in ${t.completion_year}` : t.status, t.role].filter(Boolean).join(' · '))}</span>
         ${t.protocol_phase ? `<span>Overall protocol: Phase ${esc(t.protocol_phase)}${t.phase_url ? ` · <a href="${esc(t.phase_url)}" target="_blank" rel="noopener">Cohort design</a>` : ''}</span>` : ''}
         ${t.enrollment_update ? `<span>${esc(t.enrollment_update)}${t.enrollment_url ? ` <a href="${esc(t.enrollment_url)}" target="_blank" rel="noopener">Sponsor update</a>` : ''}</span>` : ''}
-        ${t.randomized_participants ? `<span>${esc(t.randomized_participants.toLocaleString('en'))} participants randomized</span>` : ''}
+        ${t.randomized_participants ? `<span>${esc(t.randomized_participants.toLocaleString('en'))} participants randomized${t.analyzed_participants ? ` · ${esc(t.analyzed_participants.toLocaleString('en'))} analyzed` : ''}</span>` : ''}
         ${t.outcome ? `<p>${esc(t.outcome)} ${t.results_url ? `<a href="${esc(t.results_url)}" target="_blank" rel="noopener">Published results</a>` : ''}</p>` : ''}
       </li>`).join('')}</ul></details>` : ''}
     ${drugbank ? `<a class="clinical-context" href="https://go.drugbank.com/drugs/${encodeURIComponent(drugbank)}" target="_blank" rel="noopener">DrugBank · ${esc(drugbank)}</a>` : ''}
@@ -645,6 +672,10 @@ async function compoundPage(id, controlId) {
   const n = k => c[k]?.length || 0;
   const paperCount = c.dois.length;
   const data = studyData(c);
+  const meltingPoints = c.melting_points ?? [];
+  const sections = [...data.sections];
+  if (meltingPoints.length) sections.push(['mp', 'Melting Point']);
+  sections.push(['lit', 'Literature']);
   const { dark, light, controls } = data;
   app.innerHTML = `<div class="page">
   <p class="crumbs"><a href="#/">Home</a> / <a href="#/compounds">Compounds</a> / <a href="#/compounds?metal=${esc(metalsOf(c.m)[0])}">${esc(c.m)}</a> / ${id}</p>
@@ -678,13 +709,15 @@ async function compoundPage(id, controlId) {
           const target = DATA_SECTIONS[kind];
           return count ? `<button type="button" class="pill on" data-to="${target}">${dataIcon(kind)}${text} · ${count}</button>` : `<span class="pill">${text}</span>`;
         }).join('')}
+        ${meltingPoints.length ? `<button type="button" class="pill on" data-to="#mp">${dataIcon('mp')}Melting Point</button>` : ''}
         <button type="button" class="pill on" data-to="#lit" title="See literature">${paperCount} paper${paperCount === 1 ? '' : 's'}</button></div></dd>
       </dl>
       <p style="margin:16px 0 0"><a class="btn ghost" href="c/${id}.json" download="${id}.json">Download JSON</a></p>
     </div>
   </div>
-  ${studyNavigation([...data.sections, ['lit', 'Literature']])}
+  ${studyNavigation(sections)}
   ${studySectionMarkup(data)}
+  ${meltingPoints.length ? meltingPointSection(meltingPoints) : ''}
   <section class="sec" id="lit">
     <h2>Literature</h2><p class="sub">${paperCount} ${paperCount === 1 ? 'paper reports' : 'papers report'} data for this compound.</p>
     ${paperCount > 1 ? `<div class="record-controls"><label>Sort by <select id="literatureSort">
