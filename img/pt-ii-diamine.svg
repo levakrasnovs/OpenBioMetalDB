@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 117">
+  <g fill="none" stroke="#282b3b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M90 58.5L47.0 31.0 M90 58.5L47.0 86.0 M90 58.5L133.0 31.0 M90 58.5L133.0 86.0"/>
+    <path d="M47 31 25 43V74L47 86"/>
+    <path d="M133 31Q169 58.5 133 86" stroke-dasharray="3 4"/>
+  </g>
+  <g font-family="Inter,system-ui,sans-serif" font-weight="600" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="4" stroke-linejoin="round">
+    <text x="90.0" y="58.5" fill="#bf427e" font-size="18">Pt</text>
+    <text x="47.0" y="31.0" fill="#233bcb" font-size="16">N</text>
+    <text x="47.0" y="86.0" fill="#233bcb" font-size="16">N</text>
+    <text x="133.0" y="31.0" fill="#282b3b" font-size="16">L</text>
+    <text x="133.0" y="86.0" fill="#282b3b" font-size="16">L</text>
+  </g>
+</svg>

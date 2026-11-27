@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 117">
+  <g fill="none" stroke="#282b3b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M90 58.5L90.0 17.0 M90 58.5L90.0 100.0 M90 58.5L40.0 35.0 M90 58.5L40.0 82.0 M90 58.5L139.0 35.0 M90 58.5L139.0 82.0"/>
+  </g>
+  <g font-family="Inter,system-ui,sans-serif" font-weight="600" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="4" stroke-linejoin="round">
+    <text x="90.0" y="58.5" fill="#bf427e" font-size="18">Pt</text>
+    <text x="90.0" y="17.0" fill="#c12232" font-size="16">O₂CR</text>
+    <text x="90.0" y="100.0" fill="#c12232" font-size="16">O₂CR</text>
+    <text x="40.0" y="35.0" fill="#233bcb" font-size="16">H₃N</text>
+    <text x="40.0" y="82.0" fill="#233bcb" font-size="16">H₃N</text>
+    <text x="139.0" y="35.0" fill="#238044" font-size="16">Cl</text>
+    <text x="139.0" y="82.0" fill="#238044" font-size="16">Cl</text>
+  </g>
+</svg>

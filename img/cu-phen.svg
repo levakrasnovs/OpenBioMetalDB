@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 117">
+  <g fill="none" stroke="#282b3b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M90 58.5L56.0 40.5 M90 58.5L56.0 76.5"/>
+    <path d="M40.4 13.5L56.0 22.5"/>
+    <path d="M42.6 18.0L51.0 22.9"/>
+    <path d="M56.0 22.5L56.0 40.5"/>
+    <path d="M56.0 40.5L40.4 49.5"/>
+    <path d="M51.0 40.1L42.6 45.0"/>
+    <path d="M40.4 49.5L24.8 40.5"/>
+    <path d="M24.8 40.5L24.8 22.5"/>
+    <path d="M27.6 36.4L27.6 26.6"/>
+    <path d="M24.8 40.5L9.2 49.5"/>
+    <path d="M9.2 49.5L9.2 67.5"/>
+    <path d="M12.0 53.6L12.0 63.4"/>
+    <path d="M9.2 67.5L24.8 76.5"/>
+    <path d="M24.8 76.5L24.8 94.5"/>
+    <path d="M27.6 80.6L27.6 90.4"/>
+    <path d="M24.8 94.5L40.4 103.5"/>
+    <path d="M40.4 103.5L56.0 94.5"/>
+    <path d="M42.6 99.0L51.0 94.1"/>
+    <path d="M56.0 94.5L56.0 76.5"/>
+    <path d="M56.0 76.5L40.4 67.5"/>
+    <path d="M51.0 76.9L42.6 72.0"/>
+    <path d="M24.8 22.5L40.4 13.5"/>
+    <path d="M40.4 67.5L24.8 76.5"/>
+    <path d="M40.4 67.5L40.4 49.5"/>
+    <path d="M90 58.5L129.0 35.0 M90 58.5L129.0 82.0"/>
+  </g>
+  <g font-family="Inter,system-ui,sans-serif" font-weight="600" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="4" stroke-linejoin="round">
+    <text x="90.0" y="58.5" fill="#bf427e" font-size="18">Cu</text>
+    <text x="56.0" y="40.5" fill="#233bcb" font-size="12">N</text>
+    <text x="56.0" y="76.5" fill="#233bcb" font-size="12">N</text>
+    <text x="129.0" y="35.0" fill="#282b3b" font-size="16">L</text>
+    <text x="129.0" y="82.0" fill="#282b3b" font-size="16">L</text>
+  </g>
+</svg>

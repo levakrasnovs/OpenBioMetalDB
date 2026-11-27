@@ -46,16 +46,40 @@ const pRef = (d, n) => {
 const cache = {};
 async function loadCompound(id) {
   if (cache[id]) return cache[id];
-  const response = await fetch(`c/${id}.json?v=37`);
+  const response = await fetch(`c/${id}.json?v=39`);
   if (!response.ok) throw new Error(`Could not load ${id}`);
   return cache[id] = await response.json();
 }
 
 /* theme */
-$('#theme').onclick = () => {
+const themeButton = $('#theme');
+const updateThemeLabel = () => {
+  const label = document.documentElement.dataset.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+  themeButton.setAttribute('aria-label', label);
+  themeButton.title = label;
+  themeButton.querySelector('.theme-label').textContent = label;
+};
+updateThemeLabel();
+themeButton.onclick = () => {
   const cur = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
   document.documentElement.dataset.theme = cur; try { localStorage.setItem('obmd-theme', cur); } catch (e) { }
+  updateThemeLabel();
 };
+
+const menuToggle = $('#menu-toggle'), headerMenu = $('#header-menu');
+const menuIsOpen = () => menuToggle.getAttribute('aria-expanded') === 'true';
+const closeMenu = () => menuToggle.setAttribute('aria-expanded', 'false');
+menuToggle.onclick = () => menuToggle.setAttribute('aria-expanded', String(!menuIsOpen()));
+document.addEventListener('click', event => {
+  if (menuIsOpen() && (!event.target.closest('#header-menu, #menu-toggle') || event.target.closest('#header-menu a'))) closeMenu();
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !menuIsOpen()) return;
+  closeMenu();
+  menuToggle.focus();
+});
+addEventListener('hashchange', closeMenu);
+matchMedia('(max-width: 900px)').addEventListener('change', closeMenu);
 
 const LD50 = 'LD₅₀';
 const KIND = { efficacy: 'TGI', toxicity: `${LD50}/MTD`, pk: 'PK', survival: 'Survival', organs: 'Organs', biodist: 'Biodist', ic50: 'IC50', logp: 'logP', biomarkers: 'Biomarkers' };
@@ -70,7 +94,11 @@ const isCellular50 = type => /^[a-z]+50$/i.test(type);
 const controlHref = comparison => `#/c/${encodeURIComponent(comparison.compound_id)}?control=${encodeURIComponent(comparison.measurement_id)}`;
 const PHOTO_LABEL = 'Photocytotoxicity';
 const PHOTO_SHORT_LABEL = 'Photo';
-const DATA_ICONS = { efficacy: '🐁', photo: '🌞', logp: '💧', ic50: '🧫', mp: '🌡️', fda: '💊', approved: '💊', jp: '🇯🇵', cn: '🇨🇳', trials: '🧪' };
+const DATA_ICONS = {
+  efficacy: '🐁', photo: '🌞', logp: '💧', ic50: '🧫', mp: '🌡️',
+  toxicity: '⚠️', pk: '⏱️', survival: '❤️', organs: '🫀', biodist: '📍', biomarkers: '🔬',
+  fda: '💊', approved: '💊', jp: '🇯🇵', cn: '🇨🇳', trials: '🧪',
+};
 const APPROVAL_LABELS = { fda: 'FDA approved', jp: 'Approved in Japan', cn: 'Approved in China' };
 const APPROVAL_KINDS = Object.keys(APPROVAL_LABELS);
 const CLINICAL_LABELS = { ...APPROVAL_LABELS, trials: 'Clinical trials' };
@@ -81,7 +109,8 @@ const sectionIcon = id => dataIcon(SECTION_DATA_KIND[id]);
 const IV = ['efficacy', 'toxicity', 'pk', 'survival', 'organs', 'biodist', 'biomarkers'];
 const hasIV = c => IV.some(k => c.k[k]);
 const label = c => c.n?.[0] ?? c.names?.[0] ?? c.id;
-const img = (id, alt = '') => `<div class="struct"><img loading="lazy" src="s/${id}.svg" alt="${esc(alt)}" onerror="this.outerHTML='<span>No structure</span>'"></div>`;
+const structureUrl = id => `s/${id}.svg?v=20261127-142324`;
+const img = (id, alt = '') => `<div class="struct"><img loading="lazy" src="${structureUrl(id)}" alt="${esc(alt)}" onerror="this.outerHTML='<span>No structure</span>'"></div>`;
 const metalsOf = m => String(m ?? '').split(/[-;,|]/).map(s => s.trim()).filter(Boolean);
 
 function card(c, o = {}) {
@@ -101,8 +130,8 @@ function card(c, o = {}) {
   }
   if (c.k.photo) s.push(`<span class="ms ic">${dataIcon('photo')}${PHOTO_SHORT_LABEL}</span>`);
   if (c.k.efficacy) s.push(`<span class="ms iv">${dataIcon('efficacy')}in vivo</span>`);
-  if (c.k.pk) s.push('<span class="ms iv">PK</span>');
-  if (c.ld50_mtd) s.push(`<span class="ms iv">${KIND.toxicity}</span>`);
+  if (c.k.pk) s.push(`<span class="ms iv">${dataIcon('pk')}PK</span>`);
+  if (c.ld50_mtd) s.push(`<span class="ms iv">${dataIcon('toxicity')}${KIND.toxicity}</span>`);
   if (c.k.logp) s.push(`<span class="ms lp">${dataIcon('logp')}logP</span>`);
   if (c.k.mp) s.push(`<span class="ms" title="Melting Point">${dataIcon('mp')}MP</span>`);
   return `<a class="card" href="#/c/${c.id}">${img(c.id, label(c))}<div class="meta"><div class="oid">${c.id} · ${esc(c.m)}</div>
@@ -113,7 +142,7 @@ function card(c, o = {}) {
 const canonicalPaperDoi = doi => IDX.paper_aliases?.[doi.toLowerCase()] ?? doi;
 async function route() {
   hideTip();
-  if (!IDX) { IDX = await fetch('index.json?v=24').then(r => r.json()); IDX.compounds.forEach(c => BY[c.id] = c); PM = await fetch('paper_meta.json').then(r => r.json()).catch(() => ({})); }
+  if (!IDX) { IDX = await fetch('index.json?v=36').then(r => r.json()); IDX.compounds.forEach(c => BY[c.id] = c); PM = await fetch('paper_meta.json?v=2').then(r => r.json()).catch(() => ({})); }
   const h = location.hash.slice(1) || '/';
   const [encodedPath, qs] = h.split('?'); const path = decodeURIComponent(encodedPath); const q = new URLSearchParams(qs || '');
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + h));
@@ -206,7 +235,7 @@ const loadScript = src => new Promise((res, rej) => { const s = document.createE
 async function chem() {
   if (!RD) { await loadScript(RDV + 'RDKit_minimal.js'); RD = await initRDKitModule({ locateFile: () => RDV + 'RDKit_minimal.wasm' }); }
   if (!LIG) {
-    LIG = await fetch('ligands.json?v=2').then(r => r.json());
+    LIG = await fetch('ligands.json?v=4').then(r => r.json());
     LIG.bits = LIG.fp.map(b => Uint8Array.from(atob(b), ch => ch.charCodeAt(0)));
     LIG.mol = []; LIG.scm = [];
   }
@@ -281,33 +310,87 @@ async function structureSearch(smi, mode, thr) {
 }
 
 /* ---------- catalog ---------- */
-const EXAMPLES = [['p-cymene · Cl⁻', 'Cc1ccc(C(C)C)cc1.[Cl-]'], ['ppy', '[c-]1ccccc1-c1ccccn1'], ['bpy', 'c1ccc(-c2ccccn2)nc1'], ['PPh3', 'c1ccc(P(c2ccccc2)c2ccccc2)cc1'],
-['phen · phen', 'c1cnc2c(c1)ccc1cccnc12.c1cnc2c(c1)ccc1cccnc12'], ['Cp', 'c1cc[cH-]c1'], ['dfppy', 'Fc1c[c-]c(-c2ccccn2)c(F)c1']];
+const SCAFFOLDS = [
+  { id: 'ru-piano-stool', metal: 'Ru', name: 'Ru piano stool' },
+  { id: 'au-linear', metal: 'Au', ox: '1', name: 'Linear Au(I)', image: 'img/au-linear.svg' },
+  { id: 'ir-bis-cn', metal: 'Ir', ox: '3', name: 'Ir(III) bis(C,N)', image: 'img/ir-bis-cn.svg' },
+  { id: 'pt-iv-octahedral', metal: 'Pt', ox: '4', name: 'Six-coordinate Pt(IV)', image: 'img/pt-iv-octahedral.svg' },
+  { id: 'ru-tris-nn', metal: 'Ru', name: 'Ru tris(N,N)', image: 'img/ru-tris-nn.svg' },
+  { id: 'pt-nn-chelate', metal: 'Pt', ox: '2', name: 'Pt(II) N,N chelate', image: 'img/pt-nn-chelate.svg' },
+  { id: 'ir-cp', metal: 'Ir', name: 'Ir η⁵-Cp', image: 'img/ir-cp.svg' },
+  { id: 'au-nhc', metal: 'Au', ox: '1', name: 'Au(I)–NHC' },
+  { id: 'ru-bis-bpy', metal: 'Ru', name: 'Ru bis(bpy)', image: 'img/ru-bis-bpy.svg?v=2' },
+  { id: 'au-pr3', metal: 'Au', ox: '1', name: 'Au(I)–PR₃' },
+  { id: 'ru-bis-phen', metal: 'Ru', name: 'Ru bis(phen)' },
+  { id: 'ru-pph3', metal: 'Ru', name: 'Ru–PPh₃' },
+  { id: 'pt-iv-dicarboxylate', metal: 'Pt', ox: '4', name: 'Pt(IV) (NH₃)₂Cl₂(O₂CR)₂' },
+  { id: 'os-piano-stool', metal: 'Os', name: 'Os piano stool', image: 'img/os-piano-stool.svg?v=2' },
+  { id: 're-tricarbonyl', metal: 'Re', name: 'Re tricarbonyl' },
+  { id: 'rh-cp', metal: 'Rh', name: 'Rh η⁵-Cp' },
+  { id: 'pt-ii-diamine', metal: 'Pt', ox: '2', name: 'Pt(II) diamine chelate' },
+  { id: 'cu-phen', metal: 'Cu', name: 'Cu–phen' },
+  { id: 'ru-terpy', metal: 'Ru', ox: '2', name: 'Ru(II)–terpy' },
+  { id: 'pt-ii-n2cl2', metal: 'Pt', ox: '2', name: 'Pt(II)–N₂Cl₂' },
+  { id: 'tc-tricarbonyl', metal: 'Tc', ox: '1', name: 'Tc(I) tricarbonyl' },
+  { id: 'ru-cp-piano-stool', metal: 'Ru', ox: '2', name: 'Ru(II) η⁵-Cp piano stool' },
+];
 const MODES = [['full', 'Full molecule match'], ['scaffold', 'Scaffold-based'], ['sub', 'Substructure'], ['sim', 'Similarity']];
+const VISIBLE_SCAFFOLDS = 3;
 const FILTER_KIND = { ...KIND, efficacy: 'in vivo', ic50: 'IC₅₀', photo: PHOTO_SHORT_LABEL, mp: 'MP' };
 const FILTER_DATA_ORDER = [...COMPOUND_DATA_ORDER, 'mp'];
 const FILTER_TITLES = { ic50: 'Includes all cellular endpoints with a 50 index', mp: 'Melting Point' };
 const CLINICAL_FILTERS = { approved: 'Approved', trials: CLINICAL_LABELS.trials };
 const CS = { smi: '', mode: 'full', thr: .7, res: null };   // structure search state survives navigation
+const OXIDATION_ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
+const NUCLEARITY_OPTIONS = [['1', 'Mononuclear'], ['2', 'Dinuclear'], ['3', 'Trinuclear'], ['4+', '4+ metal centers']];
+const METAL_COMPOSITION_OPTIONS = [['homo', 'Homonuclear'], ['hetero', 'Heteronuclear']];
+const formatCount = new Intl.NumberFormat('en');
 function catalog(q) {
   const C = IDX.compounds, LN = IDX.lines, ORG = IDX.organ;
+  const oxidationStates = new Map();
+  const metalCounts = new Map();
+  for (const c of C) {
+    for (const metal of metalsOf(c.m)) metalCounts.set(metal, (metalCounts.get(metal) || 0) + 1);
+    if (!Number.isInteger(c.ox)) continue;
+    if (!oxidationStates.has(c.m)) oxidationStates.set(c.m, new Set());
+    oxidationStates.get(c.m).add(c.ox);
+  }
+  const oxOptions = metal => [...(oxidationStates.get(metal) || [])].sort((a, b) => a - b).map(String);
   const requestedData = (q.get('has') || '').split(',').map(k => {
     if (APPROVAL_KINDS.includes(k)) return 'approved';
     return isCellular50(k) ? 'ic50' : k;
   });
-  const st = { q: q.get('q') || '', metal: q.get('metal') || 'All',
+  const requestedMetal = q.get('metal');
+  const requestedNuclearity = q.get('nuclearity');
+  const requestedComposition = q.get('composition');
+  const metal = metalCounts.has(requestedMetal) ? requestedMetal : 'All';
+  const scaffold = SCAFFOLDS.find(item => item.id === q.get('scaffold')
+    && (metal === 'All' || metal === item.metal));
+  const initialMetal = requestedMetal === 'All' ? 'All' : (scaffold?.metal ?? metal);
+  const st = { q: q.get('q') || '', metal: initialMetal, scaffold: scaffold?.id ?? '',
+    ox: oxOptions(initialMetal).includes(q.get('ox')) ? q.get('ox') : '',
+    nuclearity: NUCLEARITY_OPTIONS.some(([value]) => value === requestedNuclearity) ? requestedNuclearity : '',
+    composition: requestedNuclearity !== '1' && METAL_COMPOSITION_OPTIONS.some(([value]) => value === requestedComposition)
+      ? requestedComposition : '',
     has: new Set(requestedData.filter(k => Object.hasOwn(FILTER_KIND, k) || Object.hasOwn(CLINICAL_FILTERS, k))),
     tissue: '', line: '', time: '', lo: null, hi: null };
-  const topM = Object.entries(C.reduce((m, c) => (metalsOf(c.m).forEach(x => m[x] = (m[x] || 0) + 1), m), {})).sort((a, b) => b[1] - a[1]).slice(0, 14).map(x => x[0]);
-  if (st.metal !== 'All' && !topM.includes(st.metal)) topM.push(st.metal);
-  const lineN = {}; C.forEach(c => c.ics.forEach(([l]) => lineN[l] = (lineN[l] || 0) + 1));
-  const tissues = [...new Set(Object.values(ORG))].sort();
-  const timeN = {}; C.forEach(c => c.ics.forEach(([, t]) => t != null && (timeN[t] = (timeN[t] || 0) + 1)));
-  const times = Object.entries(timeN).sort((a, b) => b[1] - a[1]).slice(0, 6).map(x => x[0]).sort((a, b) => a - b);
+  const topMetals = ['All', ...[...metalCounts].sort((a, b) => b[1] - a[1]).slice(0, 9).map(([m]) => m)];
+  const otherMetals = [...metalCounts.keys()].filter(m => !topMetals.includes(m)).sort();
+  const countedFilter = (id, label, search = '') => `<div class="counted-filter" id="${id}">
+    <p class="flab" id="${id}-label">${label}</p>
+    <details name="catalog-counted-filters">
+      <summary aria-labelledby="${id}-label ${id}-current"><span id="${id}-current" class="counted-option"></span></summary>
+      ${search}
+      <div class="counted-options" role="group" aria-labelledby="${id}-label"></div>
+    </details>
+  </div>`;
   app.innerHTML = `<div class="page"><div class="sec-head catalog-heading"><p class="eyebrow">Compounds</p>
-    <div class="catalog-title"><h2>Search the registry</h2><span class="catalog-count" id="cnt" role="status"></span></div>
+    <div class="catalog-title"><h2>Search the registry</h2><span class="catalog-count" id="cnt" role="status" tabindex="-1"></span></div>
   </div>
-  <div class="sbox">
+  <button type="button" class="btn catalog-filter-toggle" id="catalog-filter-toggle" aria-expanded="false" aria-controls="catalog-structure catalog-picker">
+    Filters <span class="filter-count" id="filter-count" hidden></span>
+  </button>
+  <div class="sbox" id="catalog-structure">
     <div class="srow">
       <input id="smi" placeholder='Ligand SMILES — use "." to combine several ligands' value="${esc(CS.smi)}" spellcheck="false">
       <button class="btn ghost" id="sclr" title="Clear">✕</button><button class="btn ghost" id="sdraw">✏ Draw</button>
@@ -315,62 +398,294 @@ function catalog(q) {
       <button class="btn" id="sgo">Search</button>
     </div>
     <div class="sprev" id="sprev"></div>
-    <div class="exrow"><span class="muted">Popular ligands:</span>${EXAMPLES.map(([l, s]) => `<button class="chip" data-s="${esc(s)}">${l}</button>`).join('')}</div>
+    <div class="scaffold-library" id="scaffold-library" role="group" aria-labelledby="scaffold-label">
+      <h3 id="scaffold-label">Complex scaffolds</h3>
+      <div class="scaffold-list" id="scaffold-list">${SCAFFOLDS.map(item => `
+        <button type="button" class="scaffold-option" data-scaffold="${item.id}" aria-pressed="false" hidden>
+          <img src="${item.image || `img/${item.id}.svg`}" width="120" height="78" alt="">
+          <span><strong>${item.name}</strong><small></small></span>
+        </button>`).join('')}
+        <button type="button" class="btn disclosure-btn" id="scaffold-toggle" aria-controls="scaffold-list" aria-expanded="false" hidden>Show all</button>
+      </div>
+    </div>
     <label class="thr" id="thrBox"${CS.mode === 'sim' ? '' : ' hidden'}>Tanimoto ≥ <b id="thrV">${CS.thr.toFixed(2)}</b><input type="range" id="thr" min="0.3" max="1" step="0.05" value="${CS.thr}"></label>
     <p class="smsg" id="smsg" role="status"></p>
   </div>
   <div class="cat">
-    <aside class="picker">
+    <div class="catalog-toolbar" id="catalog-toolbar" hidden>
+      <div class="active-filters" id="active-filters" role="group" aria-label="Active filters"></div>
+      <button type="button" class="btn ghost" id="freset">Reset filters</button>
+    </div>
+    <aside class="picker" id="catalog-picker">
       <input id="cq" type="search" placeholder="Name, OBMD ID, DOI…" value="${esc(st.q)}">
       <p class="flab">Metal</p>
-      <div class="chips" id="mchips">${['All', ...topM].map(m => `<button class="chip ${m === st.metal ? 'on' : ''}" data-m="${m}">${m}</button>`).join('')}</div>
+      <div class="chips" id="mchips">${[...topMetals, ...otherMetals].map((m, i) => `
+        <button type="button" class="chip${i >= topMetals.length ? ' metal-extra' : ''}${m === st.metal ? ' on' : ''}" data-m="${esc(m)}" aria-pressed="${m === st.metal}">${esc(m)} <span class="facet-count"></span></button>`).join('')}</div>
+      ${otherMetals.length ? '<button type="button" class="btn disclosure-btn metal-toggle" id="metal-toggle" aria-controls="mchips" aria-expanded="false">More metals</button>' : ''}
+      ${countedFilter('fox', 'Oxidation state')}
+      ${countedFilter('fnuclearity', 'Nuclearity')}
+      ${countedFilter('fcomposition', 'Metal composition')}
       <p class="flab">Has data</p>
-      <div class="chips has" id="hchips">${FILTER_DATA_ORDER.map(k => `<button class="chip ${st.has.has(k) ? 'on' : ''}" data-k="${k}" aria-pressed="${st.has.has(k)}"${FILTER_TITLES[k] ? ` title="${FILTER_TITLES[k]}"` : ''}>+ ${esc(FILTER_KIND[k])}</button>`).join('')}</div>
+      <div class="chips has" id="hchips">${FILTER_DATA_ORDER.map(k => `<button class="chip ${st.has.has(k) ? 'on' : ''}" data-k="${k}" aria-pressed="${st.has.has(k)}"${FILTER_TITLES[k] ? ` title="${FILTER_TITLES[k]}"` : ''}><span class="facet-label">${dataIcon(k)}${esc(FILTER_KIND[k])}</span> <span class="facet-count"></span></button>`).join('')}</div>
       <p class="flab" id="clinicalFilterLabel">Clinical status</p>
-      <div class="chips has" id="clinicalFilters" role="group" aria-labelledby="clinicalFilterLabel">${Object.entries(CLINICAL_FILTERS).map(([k, name]) => `<button type="button" class="chip ${st.has.has(k) ? 'on' : ''}" data-k="${k}" aria-pressed="${st.has.has(k)}"${k === 'approved' ? ' title="Approved in any country"' : ''}>${dataIcon(k)}${name}</button>`).join('')}</div>
+      <div class="chips has" id="clinicalFilters" role="group" aria-labelledby="clinicalFilterLabel">${Object.entries(CLINICAL_FILTERS).map(([k, name]) => `<button type="button" class="chip ${st.has.has(k) ? 'on' : ''}" data-k="${k}" aria-pressed="${st.has.has(k)}"${k === 'approved' ? ' title="Approved in any country"' : ''}><span class="facet-label">${dataIcon(k)}${name}</span> <span class="facet-count"></span></button>`).join('')}</div>
       <p class="flab">Cytotoxicity</p>
-      <select id="ftis"><option value="">All tissues</option>${tissues.map(t => `<option>${esc(t)}</option>`).join('')}</select>
-      <select id="fline"></select>
-      <select id="ftime"><option value="">All exposure times</option>${times.map(t => `<option value="${t}">${t} h</option>`).join('')}</select>
+      ${countedFilter('ftis', 'Tissue')}
+      ${countedFilter('fline', 'Cell line', '<input type="search" id="cell-line-search" placeholder="Search cell lines" aria-label="Search cell lines" autocomplete="off" spellcheck="false">')}
+      ${countedFilter('ftime', 'Exposure time')}
       <div class="two"><input id="flo" type="number" min="0" step="any" placeholder="IC₅₀ min, µM" aria-label="Minimum IC₅₀ (µM)"><input id="fhi" type="number" min="0" step="any" placeholder="IC₅₀ max, µM" aria-label="Maximum IC₅₀ (µM)"></div>
       <label class="flab" for="sort">Sort</label>
-      <div class="filter-actions">
-        <select id="sort"><option value="sim">Most similar</option><option value="p">Most papers</option><option value="ic">Most cytotoxic</option><option value="icd">Least cytotoxic</option><option value="new">Newest first</option><option value="old">Oldest first</option><option value="tgi">Best TGI</option><option value="lp">logP</option><option value="id">OBMD ID</option></select>
-        <button class="btn ghost" id="freset">Reset filters</button>
-      </div>
+      <select id="sort"><option value="sim">Most similar</option><option value="p">Most papers</option><option value="ic">Most cytotoxic</option><option value="icd">Least cytotoxic</option><option value="new">Newest first</option><option value="old">Oldest first</option><option value="tgi">Best TGI</option><option value="lp">logP</option><option value="id">OBMD ID</option></select>
+      <button type="button" class="btn catalog-show-results" id="catalog-show-results">Show results</button>
     </aside>
     <section aria-label="Search results"><div class="grid" id="grid"></div><button class="btn ghost more" id="more">Show more</button></section>
   </div></div>
   <div class="modal" id="dmodal" hidden><div class="mbox kbox"><div class="mhead"><b>Draw a ligand</b><button class="btn ghost" id="dclose">✕</button></div>
     <iframe id="kframe" title="Ketcher"></iframe><p class="muted" style="font-size:12px;margin:8px 0">Draw the free ligand without the metal and press <b>Apply</b>. Use the Metal filter for the metal.</p></div></div>`;
-  const fillLines = () => {
-    const ls = Object.keys(lineN).map(Number).filter(l => !st.tissue || ORG[LN[l]] === st.tissue).sort((a, b) => lineN[b] - lineN[a]).slice(0, st.tissue ? 500 : 60);
-    $('#fline').innerHTML = `<option value="">All cell lines</option>` + ls.map(l => `<option value="${l}">${esc(LN[l])} (${lineN[l]})</option>`).join('');
-  };
-  fillLines();
   $('#sort').value = CS.res?.score ? 'sim' : 'p';
   let shown = 60;
   let searchVersion = 0;
   const searchButton = $('#sgo');
+  const filtersToggle = $('#catalog-filter-toggle');
+  const filterCount = $('#filter-count');
+  const activeFilters = $('#active-filters');
+  const filterToolbar = $('#catalog-toolbar');
+  const renderActiveFilters = () => {
+    const chips = [
+      ['q', st.q.trim() && `Search: ${st.q.trim()}`],
+      ['structure', (CS.res || searchButton.disabled) && CS.smi && `Structure: ${CS.smi}`],
+      ['metal', st.metal !== 'All' && st.metal],
+      ['scaffold', SCAFFOLDS.find(item => item.id === st.scaffold)?.name],
+      ['ox', st.ox && `${st.metal}(${OXIDATION_ROMAN[st.ox] ?? st.ox})`],
+      ['nuclearity', NUCLEARITY_OPTIONS.find(([value]) => value === st.nuclearity)?.[1]],
+      ['composition', METAL_COMPOSITION_OPTIONS.find(([value]) => value === st.composition)?.[1]],
+      ...[...st.has].map(kind => [`data:${kind}`, CLINICAL_FILTERS[kind] ?? FILTER_KIND[kind], kind]),
+      ['tissue', st.tissue],
+      ['line', st.line !== '' && String(LN[st.line])],
+      ['time', st.time && `${st.time} h`],
+      ['lo', st.lo != null && `IC₅₀ ≥ ${st.lo} µM`],
+      ['hi', st.hi != null && `IC₅₀ ≤ ${st.hi} µM`],
+    ].filter(([, label]) => label);
+    activeFilters.innerHTML = chips.map(([key, label, kind]) => `<button type="button" class="chip on active-filter-chip" data-remove-filter="${esc(key)}" aria-label="Remove filter: ${esc(label)}" title="${esc(label)}"><span>${kind ? dataIcon(kind) : ''}${esc(label)}</span><span aria-hidden="true">×</span></button>`).join('');
+    filterToolbar.hidden = !chips.length;
+    filterCount.textContent = chips.length ? `${chips.length} active` : '';
+    filterCount.hidden = !chips.length;
+  };
+  filtersToggle.onclick = () => {
+    filtersToggle.setAttribute('aria-expanded', filtersToggle.getAttribute('aria-expanded') === 'false');
+  };
+  $('#catalog-show-results').onclick = () => {
+    filtersToggle.setAttribute('aria-expanded', 'false');
+    filtersToggle.focus();
+  };
   const icFilter = () => st.tissue || st.line !== '' || st.time || st.lo != null || st.hi != null;
-  const icOk = ([l, t, v]) => (!st.tissue || ORG[LN[l]] === st.tissue) && (st.line === '' || l === +st.line) && (!st.time || t == st.time) && (st.lo == null || v >= st.lo) && (st.hi == null || v <= st.hi);
+  const icInRange = v => (st.lo == null || v >= st.lo) && (st.hi == null || v <= st.hi);
+  const icOk = ([l, t, v]) => (!st.tissue || ORG[LN[l]] === st.tissue) && (st.line === '' || l === +st.line) && (!st.time || String(t) === st.time) && icInRange(v);
   const hasData = (c, k) => {
     if (k === 'approved') return APPROVAL_KINDS.some(k => c.clinical?.[k]);
     if (k === 'ic50') return Object.entries(cytoCounts(c)).some(([type, count]) => count > 0 && isCellular50(type));
     return c.k[k] || c.clinical?.[k];
   };
+  const metalButtons = $('#mchips').querySelectorAll('[data-m]');
+  const dataButtons = $('#catalog-picker').querySelectorAll('[data-k]');
+  const scaffoldLibrary = $('#scaffold-library');
+  const scaffoldList = $('#scaffold-list');
+  const scaffoldButtons = [...scaffoldList.querySelectorAll('[data-scaffold]')];
+  const scaffoldToggle = $('#scaffold-toggle');
+  const addCount = (counts, key) => counts.set(key, (counts.get(key) || 0) + 1);
+  const setOptions = (filter, options, counts, selected, visible = options) => {
+    const optionContent = (value, label) =>
+      `<span>${esc(label)}</span><span class="facet-count">${formatCount.format(counts.get(value) || 0)}</span>`;
+    const current = options.find(([value]) => value === selected) ?? options[0];
+    filter.querySelector('summary .counted-option').innerHTML = optionContent(...current);
+    filter.querySelector('.counted-options').innerHTML = visible.map(([value, label]) =>
+      `<button type="button" class="counted-option" data-value="${esc(value)}" aria-pressed="${value === selected}">${optionContent(value, label)}</button>`).join('')
+      || '<p class="counted-empty" role="status">No matching cell lines</p>';
+  };
+  const setChipCount = (button, count) => {
+    button.querySelector('.facet-count').textContent = formatCount.format(count);
+    button.classList.toggle('facet-empty', count === 0);
+  };
+  const countCytotoxicity = (measurements, counts) => {
+    const tissues = new Set(), lines = new Set(), times = new Set();
+    if (st.lo == null && st.hi == null) {
+      // Clearing the last cytotoxicity condition also admits compounds with no IC₅₀ values.
+      if (!st.time && (st.tissue || st.line === '')) tissues.add('');
+      if (!st.tissue && !st.time) lines.add('');
+      if (!st.tissue && st.line === '') times.add('');
+    }
+    for (const [line, time, value] of measurements) {
+      if (!icInRange(value)) continue;
+      const tissue = ORG[LN[line]];
+      const tissueOK = !st.tissue || tissue === st.tissue;
+      const lineOK = st.line === '' || line === +st.line;
+      if (!st.time || String(time) === st.time) {
+        // Changing tissue clears the cell line, while keeping the same tissue preserves it.
+        if (tissue && (tissue !== st.tissue || lineOK)) tissues.add(tissue);
+        if (st.tissue || lineOK) tissues.add('');
+        if (tissueOK) {
+          lines.add('');
+          lines.add(String(line));
+        }
+      }
+      if (tissueOK && lineOK) {
+        times.add('');
+        if (Number.isFinite(time)) times.add(String(time));
+      }
+    }
+    for (const tissue of tissues) addCount(counts.tissue, tissue);
+    for (const line of lines) addCount(counts.line, line);
+    for (const time of times) addCount(counts.time, time);
+  };
+  const lineFilter = $('#fline');
+  const lineSearch = $('#cell-line-search');
+  const compactLineName = name => name.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  const renderCytotoxicity = ({tissue, line, time}) => {
+    const values = (counts, selected) => [...new Set([...counts.keys(), selected])].filter(Boolean);
+    const byCount = (counts, a, b) => (counts.get(b) || 0) - (counts.get(a) || 0);
+    const tissues = values(tissue, st.tissue).sort((a, b) => byCount(tissue, a, b) || a.localeCompare(b, 'en'))
+      .map(value => [value, value]);
+    const lines = values(line, st.line).sort((a, b) => byCount(line, a, b));
+    const visibleLines = lines.slice(0, st.tissue ? 500 : 60);
+    if (st.line && !visibleLines.includes(st.line)) visibleLines.push(st.line);
+    const allLines = ['', 'All cell lines'];
+    const defaultLines = [allLines, ...visibleLines.map(value => [value, LN[value]])];
+    lineSearch.oninput = () => {
+      const term = lineSearch.value.trim().toLowerCase();
+      const compact = compactLineName(term);
+      const matching = term ? lines.filter(value => {
+        const name = String(LN[value] ?? '').toLowerCase();
+        return name.includes(term) || (compact && compactLineName(name).includes(compact));
+      })
+        .map(value => [value, LN[value]]) : defaultLines;
+      setOptions(lineFilter, defaultLines, line, st.line, matching);
+      lineFilter.querySelector('.counted-options').scrollTop = 0;
+    };
+    lineSearch.oninput();
+    const times = values(time, st.time).sort((a, b) => byCount(time, a, b) || Number(a) - Number(b))
+      .map(value => [value, `${value} h`]);
+    setOptions($('#ftis'), [['', 'All tissues'], ...tissues], tissue, st.tissue);
+    setOptions($('#ftime'), [['', 'All exposure times'], ...times], time, st.time);
+  };
+  const renderScaffolds = counts => {
+    const countFor = button => counts.get(button.dataset.scaffold) || 0;
+    const ranked = [];
+    for (const button of scaffoldButtons) {
+      const count = countFor(button), selected = button.dataset.scaffold === st.scaffold;
+      button.hidden = !count && !selected;
+      button.setAttribute('aria-pressed', selected);
+      if (!button.hidden) {
+        button.querySelector('small').textContent = `${formatCount.format(count)} ${count === 1 ? 'complex' : 'complexes'}`;
+        ranked.push(button);
+      }
+    }
+    ranked.sort((a, b) => countFor(b) - countFor(a));
+    ranked.forEach((button, i) => button.classList.toggle('scaffold-extra', i >= VISIBLE_SCAFFOLDS));
+    scaffoldLibrary.hidden = !ranked.length;
+    scaffoldToggle.hidden = ranked.filter(countFor).length <= VISIBLE_SCAFFOLDS;
+    if (!scaffoldToggle.hidden) ranked.splice(VISIBLE_SCAFFOLDS, 0, scaffoldToggle);
+
+    const focused = document.activeElement;
+    let next = scaffoldList.firstElementChild;
+    for (const button of ranked) {
+      if (button !== next) scaffoldList.insertBefore(button, next);
+      next = button.nextElementSibling;
+    }
+    if (ranked.includes(focused) && document.activeElement !== focused) focused.focus({preventScroll: true});
+  };
   const render = () => {
-    const t = st.q.toLowerCase(), so = $('#sort').value, R = CS.res, F = icFilter();
-    let rows = C.filter(c => (!R || R.ids.has(c.id)) && (st.metal === 'All' || metalsOf(c.m).includes(st.metal)) && [...st.has].every(k => hasData(c, k)) &&
-      (!t || c.id.toLowerCase().includes(t) || c.n.some(n => n.toLowerCase().includes(t)) || (t.startsWith('10.') && (IDX.papers[canonicalPaperDoi(t)] || []).includes(c.id))));
-    const bestIC = new Map();
-    if (F) rows = rows.filter(c => { const v = c.ics.filter(icOk).map(x => x[2]); if (v.length) bestIC.set(c.id, Math.min(...v)); return v.length; });
+    const t = st.q.trim().toLowerCase(), so = $('#sort').value, R = CS.res, F = icFilter();
+    const required = [...st.has];
+    const paperIds = t.startsWith('10.') ? new Set(IDX.papers[canonicalPaperDoi(t)] || []) : null;
+    const scaffoldMetal = SCAFFOLDS.find(item => item.id === st.scaffold)?.metal;
+    const metals = new Map(), nuclearity = new Map(), composition = new Map(), oxidation = new Map();
+    const scaffolds = new Map();
+    const cytotoxicity = { tissue: new Map(), line: new Map(), time: new Map() };
+    const bestIC = new Map(), rows = [];
+    for (const c of C) {
+      if (R && !R.ids.has(c.id)) continue;
+      if (t && !c.id.toLowerCase().includes(t) && !c.n.some(n => n.toLowerCase().includes(t)) && !paperIds?.has(c.id)) continue;
+      if (!required.every(k => hasData(c, k))) continue;
+      const elements = metalsOf(c.m);
+      const nuclei = c.nuclearity >= 4 ? '4+' : String(c.nuclearity ?? '');
+      const state = c.m === st.metal && Number.isInteger(c.ox) ? String(c.ox) : '';
+      const metalOK = st.metal === 'All' || elements.includes(st.metal);
+      const scaffoldOK = !st.scaffold || c.scaffolds?.includes(st.scaffold);
+      const oxOK = !st.ox || st.ox === state;
+      const nucleiOK = !st.nuclearity || st.nuclearity === nuclei;
+      const compositionOK = !st.composition || c.heteronuclear === (st.composition === 'hetero');
+
+      if (metalOK && scaffoldOK && oxOK && nucleiOK && compositionOK) countCytotoxicity(c.ics, cytotoxicity);
+      if (F) {
+        const values = c.ics.filter(icOk).map(([, , value]) => value);
+        if (!values.length) continue;
+        bestIC.set(c.id, Math.min(...values));
+      }
+      if (nucleiOK && compositionOK) {
+        if (scaffoldOK) addCount(metals, 'All');
+        for (const element of new Set(elements)) {
+          // Switching metals clears oxidation and any incompatible scaffold.
+          if ((element !== st.metal || oxOK) && (element !== scaffoldMetal || scaffoldOK)) addCount(metals, element);
+        }
+      }
+      if (!metalOK) continue;
+      // Count alternative scaffolds against the other active filters.
+      if (nucleiOK && compositionOK && oxOK && c.scaffolds) {
+        for (const id of c.scaffolds) addCount(scaffolds, id);
+      }
+      if (!scaffoldOK) continue;
+      if (oxOK && compositionOK) {
+        addCount(nuclearity, '');
+        if (nuclei) addCount(nuclearity, nuclei);
+      } else if (oxOK && nuclei === '1') {
+        // Selecting Mononuclear clears the composition filter.
+        addCount(nuclearity, '1');
+      }
+      if (oxOK && nucleiOK) {
+        addCount(composition, '');
+        if (typeof c.heteronuclear === 'boolean') addCount(composition, c.heteronuclear ? 'hetero' : 'homo');
+      }
+      if (nucleiOK && compositionOK) {
+        addCount(oxidation, '');
+        if (state) addCount(oxidation, state);
+        if (oxOK) rows.push(c);
+      }
+    }
+    for (const button of metalButtons) {
+      const selected = button.dataset.m === st.metal;
+      button.classList.toggle('on', selected);
+      button.setAttribute('aria-pressed', selected);
+      setChipCount(button, metals.get(button.dataset.m) || 0);
+    }
+    setOptions($('#fnuclearity'), [['', 'All nuclearities'], ...NUCLEARITY_OPTIONS], nuclearity, st.nuclearity);
+    const compositionSelect = $('#fcomposition');
+    compositionSelect.hidden = st.nuclearity === '1';
+    setOptions(compositionSelect, [['', 'All compositions'], ...METAL_COMPOSITION_OPTIONS], composition, st.composition);
+    renderScaffolds(scaffolds);
+    renderCytotoxicity(cytotoxicity);
+    const options = oxOptions(st.metal);
+    const oxSelect = $('#fox');
+    oxSelect.hidden = !options.length;
+    if (options.length) {
+      setOptions(oxSelect, [['', 'All states'], ...options.map(value =>
+        [value, `${st.metal}(${OXIDATION_ROMAN[value] ?? value})`])], oxidation, st.ox);
+    }
+    for (const button of dataButtons) {
+      const kind = button.dataset.k;
+      const selected = st.has.has(kind);
+      const count = selected ? rows.length : rows.filter(c => hasData(c, kind)).length;
+      setChipCount(button, count);
+      button.classList.toggle('on', selected);
+      button.setAttribute('aria-pressed', selected);
+      button.disabled = !count && !selected;
+    }
     const ic = c => bestIC.get(c.id) ?? (c.ics.length ? Math.min(...c.ics.map(x => x[2])) : null);
     const key = { sim: c => -(R?.score?.get(c.id) ?? 0) - c.p / 1e6, p: c => -c.p, id: c => c.id, tgi: c => -(c.tgi ?? -1e9), ic: c => ic(c) ?? 1e12, icd: c => -(ic(c) ?? -1e12), new: c => -(c.y ?? 0), old: c => c.y ?? 1e9, lp: c => c.lp ?? 1e9 }[so];
     rows.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
     const count = $('#cnt');
     const total = `${rows.length.toLocaleString('en')} ${rows.length === 1 ? 'result' : 'results'}`;
     if (count.textContent !== total) count.textContent = total;
+    renderActiveFilters();
     $('#grid').innerHTML = rows.slice(0, shown).map(c => card(c, { sim: R?.score?.get(c.id) })).join('');
     $('#more').style.display = rows.length > shown ? '' : 'none';
   };
@@ -384,8 +699,13 @@ function catalog(q) {
     const smi = CS.smi = $('#smi').value.trim();
     const { mode, thr } = CS;
     const current = () => searchButton.isConnected && search === searchVersion;
-    if (!smi) { CS.res = null; searchButton.disabled = false; $('#smsg').textContent = ''; $('#sprev').innerHTML = ''; shown = 60; render(); return; }
+    if (!smi) {
+      CS.res = null; searchButton.disabled = false; $('#smsg').textContent = ''; $('#sprev').innerHTML = '';
+      if ($('#sort').value === 'sim') $('#sort').value = 'p';
+      shown = 60; render(); return;
+    }
     $('#smsg').innerHTML = '<span class="spin"></span> ' + (RD ? 'Searching…' : 'Loading the chemistry engine…'); searchButton.disabled = true;
+    renderActiveFilters();
     await new Promise(r => setTimeout(r, 30));
     if (!current()) return;
     try {
@@ -402,30 +722,163 @@ function catalog(q) {
   };
   $('#sgo').onclick = run; $('#smi').onkeydown = e => e.key === 'Enter' && run();
   $('#smi').oninput = () => { if (RD) preview(); };
-  $('#sclr').onclick = () => { $('#smi').value = ''; run(); };
-  app.querySelectorAll('.exrow .chip').forEach(b => b.onclick = () => { $('#smi').value = b.dataset.s; run(); });
+  const clearStructure = () => { $('#smi').value = ''; run(); };
+  $('#sclr').onclick = clearStructure;
   $('#smode').onchange = e => { CS.mode = e.target.value; $('#thrBox').hidden = CS.mode !== 'sim'; if (CS.smi) run(); };
   $('#thr').oninput = e => { CS.thr = +e.target.value; $('#thrV').textContent = CS.thr.toFixed(2); };
   $('#thr').onchange = () => CS.smi && run();
-  $('#cq').oninput = e => { st.q = e.target.value; shown = 60; render(); };
-  $('#mchips').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; st.metal = b.dataset.m; $('#mchips').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); shown = 60; render(); };
+  $('#cq').oninput = e => { st.q = e.target.value; updateCatalogUrl(); shown = 60; render(); };
+  const updateCatalogUrl = () => {
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    if (st.metal === 'All' && !st.scaffold) params.delete('metal'); else params.set('metal', st.metal);
+    if (st.q) params.set('q', st.q); else params.delete('q');
+    if (st.has.size) params.set('has', [...st.has].join(',')); else params.delete('has');
+    if (st.ox) params.set('ox', st.ox); else params.delete('ox');
+    if (st.nuclearity) params.set('nuclearity', st.nuclearity); else params.delete('nuclearity');
+    if (st.composition) params.set('composition', st.composition); else params.delete('composition');
+    if (st.scaffold) params.set('scaffold', st.scaffold); else params.delete('scaffold');
+    const query = params.toString();
+    history.replaceState(history.state, '', `#/compounds${query ? '?' + query : ''}`);
+  };
+  const selectMetal = metal => {
+    if (st.metal === metal) return;
+    st.metal = metal;
+    st.ox = '';
+    if (metal !== 'All' && !SCAFFOLDS.some(item => item.id === st.scaffold && item.metal === metal)) {
+      st.scaffold = '';
+    }
+    updateCatalogUrl();
+    shown = 60;
+    render();
+  };
+  scaffoldToggle.onclick = () => {
+    const expanded = scaffoldList.classList.toggle('expanded');
+    scaffoldToggle.setAttribute('aria-expanded', expanded);
+    scaffoldToggle.textContent = expanded ? 'Show less' : 'Show all';
+  };
+  scaffoldList.onclick = e => {
+    const button = e.target.closest('[data-scaffold]');
+    const item = SCAFFOLDS.find(item => item.id === button?.dataset.scaffold);
+    if (!item) return;
+    st.scaffold = st.scaffold === item.id ? '' : item.id;
+    if (st.scaffold && st.metal !== item.metal) return selectMetal(item.metal);
+    if (st.scaffold && item.ox && st.ox !== item.ox) st.ox = '';
+    updateCatalogUrl();
+    shown = 60;
+    render();
+    if (!st.scaffold && (button.hidden ||
+      (button.classList.contains('scaffold-extra') && !scaffoldList.classList.contains('expanded')))) {
+      (scaffoldToggle.hidden ? $('#smi') : scaffoldToggle).focus();
+    }
+  };
+  const metalChips = $('#mchips');
+  metalChips.onclick = e => {
+    const b = e.target.closest('[data-m]');
+    if (b) selectMetal(b.dataset.m);
+  };
+  const metalToggle = $('#metal-toggle');
+  if (metalToggle) metalToggle.onclick = () => {
+    const expanded = metalChips.classList.toggle('expanded');
+    metalToggle.setAttribute('aria-expanded', expanded);
+    metalToggle.textContent = expanded ? 'Fewer metals' : 'More metals';
+  };
+  const catalogPage = app.querySelector('.page');
+  for (const [id, key] of [
+    ['fox', 'ox'], ['fnuclearity', 'nuclearity'], ['fcomposition', 'composition'],
+    ['ftis', 'tissue'], ['fline', 'line'], ['ftime', 'time'],
+  ]) {
+    const dropdown = $(`#${id} details`);
+    const summary = dropdown.querySelector('summary');
+    dropdown.querySelector('.counted-options').onclick = event => {
+      const option = event.target.closest('button[data-value]');
+      if (!option) return;
+      const value = option.dataset.value;
+      if (key === 'tissue' && value !== st.tissue) st.line = '';
+      st[key] = value;
+      if (st.nuclearity === '1') st.composition = '';
+      summary.focus();
+      dropdown.open = false;
+      updateCatalogUrl();
+      shown = 60;
+      render();
+    };
+    catalogPage.addEventListener('click', event => {
+      if (dropdown.open && !dropdown.contains(event.target)) dropdown.open = false;
+    });
+    dropdown.onfocusout = event => {
+      if (event.relatedTarget && !dropdown.contains(event.relatedTarget)) dropdown.open = false;
+    };
+    if (id === 'fline') dropdown.ontoggle = () => {
+      if (dropdown.open || !lineSearch.value) return;
+      lineSearch.value = '';
+      lineSearch.oninput();
+    };
+    dropdown.onkeydown = event => {
+      if (event.key === 'Escape' && dropdown.open) {
+        event.preventDefault();
+        summary.focus();
+        dropdown.open = false;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      dropdown.open = true;
+      const options = [...dropdown.querySelectorAll('button')];
+      const index = options.indexOf(event.target);
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      if (event.target === lineSearch) {
+        options.at(direction === 1 ? 0 : -1)?.focus();
+        return;
+      }
+      if (id === 'fline' && index === 0 && direction === -1) {
+        lineSearch.focus();
+        return;
+      }
+      const next = index < 0 ? options.find(option => option.getAttribute('aria-pressed') === 'true')
+        : options[(index + direction + options.length) % options.length];
+      next?.focus();
+    };
+  }
   $('#hchips').onclick = $('#clinicalFilters').onclick = e => {
     const b = e.target.closest('.chip');
     if (!b) return;
     const k = b.dataset.k;
     if (st.has.has(k)) st.has.delete(k);
     else st.has.add(k);
-    b.classList.toggle('on', st.has.has(k));
-    if (b.hasAttribute('aria-pressed')) b.setAttribute('aria-pressed', st.has.has(k));
+    updateCatalogUrl();
     shown = 60;
     render();
   };
-  $('#ftis').onchange = e => { st.tissue = e.target.value; st.line = ''; fillLines(); shown = 60; render(); };
-  $('#fline').onchange = e => { st.line = e.target.value; shown = 60; render(); };
-  $('#ftime').onchange = e => { st.time = e.target.value; shown = 60; render(); };
   $('#flo').oninput = e => { st.lo = e.target.value === '' ? null : +e.target.value; shown = 60; render(); };
   $('#fhi').oninput = e => { st.hi = e.target.value === '' ? null : +e.target.value; shown = 60; render(); };
-  $('#freset').onclick = () => { location.hash = '/compounds?r=' + Date.now(); };
+  activeFilters.onclick = event => {
+    const button = event.target.closest('[data-remove-filter]');
+    if (!button) return;
+    const position = [...activeFilters.children].indexOf(button);
+    const key = button.dataset.removeFilter;
+    if (key === 'metal') {
+      selectMetal('All');
+    } else if (key === 'structure') {
+      clearStructure();
+    } else {
+      if (key.startsWith('data:')) {
+        st.has.delete(key.slice(5));
+      } else {
+        st[key] = key === 'lo' || key === 'hi' ? null : '';
+        const input = { q: '#cq', lo: '#flo', hi: '#fhi' }[key];
+        if (input) $(input).value = '';
+      }
+      updateCatalogUrl();
+      shown = 60;
+      render();
+    }
+    (activeFilters.children[position] ?? activeFilters.lastElementChild ?? $('#cnt')).focus({ preventScroll: true });
+  };
+  $('#freset').onclick = () => {
+    searchVersion++;
+    CS.smi = '';
+    CS.res = null;
+    location.hash = '/compounds?r=' + Date.now();
+  };
   $('#sort').onchange = render;
   $('#more').onclick = () => { shown += 60; render(); };
   /* drawing: Ketcher (the build shipped with streamlit-ketcher), driven through the Streamlit component protocol */
@@ -501,9 +954,12 @@ function showPaperData(container, compounds, source, incomplete) {
     const selection = picker?.value ? [byId.get(picker.value)] : [...byId.values()];
     const rows = Object.fromEntries(Object.keys(KIND).map(k => [k, selection.flatMap(c => c.rows[k])]));
     const data = studyData(rows);
+    const sections = data.sections.flatMap(section => section[0] === 'iv'
+      ? IV.filter(kind => rows[kind].length).map(kind => [DATA_SECTIONS[kind].slice(1), FILTER_KIND[kind], kind])
+      : [section]);
     const meltingPoints = selection.flatMap(c => c.meltingPoints);
-    if (meltingPoints.length) data.sections.push(['mp', 'Melting Point']);
-    target.innerHTML = studyNavigation(data.sections) + studySectionMarkup(data)
+    if (meltingPoints.length) sections.push(['mp', 'Melting Point']);
+    target.innerHTML = studyNavigation(sections) + studySectionMarkup(data)
       + (meltingPoints.length ? meltingPointSection(meltingPoints, true) : '');
     bindSectionNavigation(target);
     fillStudySections(data);
@@ -573,8 +1029,8 @@ function studyData(c) {
 }
 
 function studyNavigation(sections) {
-  return `<nav class="secnav" aria-label="Data sections">${sections.map(([id, title]) =>
-    `<a href="javascript:void(0)" data-to="#${id}">${sectionIcon(id)}${title}</a>`).join('')}</nav>`;
+  return `<nav class="secnav" aria-label="Data sections">${sections.map(([id, title, kind]) =>
+    `<a href="javascript:void(0)" data-to="#${id}">${kind ? dataIcon(kind) : sectionIcon(id)}${title}</a>`).join('')}</nav>`;
 }
 
 function bindSectionNavigation(container) {
@@ -686,7 +1142,7 @@ async function compoundPage(id, controlId) {
   app.innerHTML = `<div class="page">
   <p class="crumbs"><a href="#/">Home</a> / <a href="#/compounds">Compounds</a> / <a href="#/compounds?metal=${esc(metalsOf(c.m)[0])}">${esc(c.m)}</a> / ${id}</p>
   <div class="chead">
-    <div class="struct" style="aspect-ratio:21/17"><img src="s/${id}.svg" alt="" onerror="this.outerHTML='<span>No structure drawn</span>'"></div>
+    <div class="struct" style="aspect-ratio:21/17"><img src="${structureUrl(id)}" alt="" onerror="this.outerHTML='<span>No structure drawn</span>'"></div>
     <div>
       <div class="idrow"><span class="oidbig">${id}</span><button class="copy" data-copy="${id}">copy ID</button>${c.kt !== 'structure' ? '<span class="badge other">matched by ligands</span>' : ''}</div>
       <h1>${esc(label(c))}</h1>
@@ -707,14 +1163,14 @@ async function compoundPage(id, controlId) {
           }
           if (kind === 'ic50') {
             const count = cytoCounts(c).IC50;
-            if (!count) return '<span class="pill">IC<sub>50</sub></span>';
+            if (!count) return `<span class="pill">${dataIcon(kind)}IC<sub>50</sub></span>`;
             const target = [...dark, ...controls].some(row => cytoType(row) === 'IC50') ? '#ic' : '#photo';
             return `<button type="button" class="pill on" data-type="IC50" data-to="${target}">${dataIcon(kind)}IC<sub>50</sub> · ${count}</button>`;
           }
           const count = n(kind);
           const text = kind === 'efficacy' ? 'in vivo' : KIND[kind];
           const target = DATA_SECTIONS[kind];
-          return count ? `<button type="button" class="pill on" data-to="${target}">${dataIcon(kind)}${text} · ${count}</button>` : `<span class="pill">${text}</span>`;
+          return count ? `<button type="button" class="pill on" data-to="${target}">${dataIcon(kind)}${text} · ${count}</button>` : `<span class="pill">${dataIcon(kind)}${text}</span>`;
         }).join('')}
         ${meltingPoints.length ? `<button type="button" class="pill on" data-to="#mp">${dataIcon('mp')}Melting Point</button>` : ''}
         <button type="button" class="pill on" data-to="#lit" title="See literature">${paperCount} paper${paperCount === 1 ? '' : 's'}</button></div></dd>
@@ -1217,11 +1673,11 @@ function showLipophilicity(records) {
 
 /* ================= in vivo block (from the in vivo prototype) ================= */
 const ivSection = () => `<section class="sec" id="iv"><h2>${sectionIcon('iv')}In vivo</h2><p class="sub">Efficacy, toxicity, organ effects, biodistribution, pharmacokinetics and survival in animal models.</p>
-  <div class="block" id="bEff"><h4>Tumour growth inhibition</h4>
+  <div class="block" id="bEff"><h4>${dataIcon('efficacy')}Tumour growth inhibition</h4>
     <div class="record-controls" id="effControls"></div>
     <div class="dtab record-table study-table" id="effTable"></div>
   </div>
-  <div class="block" id="bBio"><h4>Biodistribution</h4>
+  <div class="block" id="bBio"><h4>${dataIcon('biodist')}Biodistribution</h4>
     <div class="record-controls" id="bioControls"><label for="bioSel">Experiment <select id="bioSel"></select></label></div>
     <dl class="study-facts bio-context" id="bioContext"></dl>
     <div class="anatomy-layout">
@@ -1232,16 +1688,16 @@ const ivSection = () => `<section class="sec" id="iv"><h2>${sectionIcon('iv')}In
       <div class="dtab bio-table" id="bioTable"></div>
     </div>
   </div>
-  <div class="block" id="bOrg"><h4>Organ toxicity</h4>
+  <div class="block" id="bOrg"><h4>${dataIcon('organs')}Organ toxicity</h4>
     <div class="anatomy-layout">
       <svg viewBox="0 65 600 245" class="xray" id="cOrgMouse"></svg>
       <div class="ptab" id="orgTable"></div>
     </div>
   </div>
-  <div class="block" id="bSafety"><h4>Safety biomarkers</h4><div class="dtab record-table study-table" id="biomarkerTable"></div></div>
-  <div class="block" id="bTox"><h4>Acute toxicity</h4><div class="dtab record-table study-table" id="toxTable"></div></div>
-  <div class="block" id="bPK"><h4>Pharmacokinetics</h4><div class="dtab record-table study-table" id="pkTable"></div></div>
-  <div class="block" id="bSurv"><h4>Survival</h4>
+  <div class="block" id="bSafety"><h4>${dataIcon('biomarkers')}Safety biomarkers</h4><div class="dtab record-table study-table" id="biomarkerTable"></div></div>
+  <div class="block" id="bTox"><h4>${dataIcon('toxicity')}Acute toxicity</h4><div class="dtab record-table study-table" id="toxTable"></div></div>
+  <div class="block" id="bPK"><h4>${dataIcon('pk')}Pharmacokinetics</h4><div class="dtab record-table study-table" id="pkTable"></div></div>
+  <div class="block" id="bSurv"><h4>${dataIcon('survival')}Survival</h4>
     <div class="record-controls" id="survControls"></div>
     <div class="dtab record-table study-table" id="survTable"></div>
   </div>

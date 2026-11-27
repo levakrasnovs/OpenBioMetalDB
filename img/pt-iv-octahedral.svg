@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 117">
+  <g fill="none" stroke="#282b3b" stroke-width="1.8" stroke-linecap="round">
+    <path d="M90 18V99"/>
+    <path d="M82 54 39 29M98 54l43-25" stroke-dasharray="2 4"/>
+  </g>
+  <path fill="#282b3b" d="M90 58.5 39 92 34 82ZM90 58.5l51 33.5 5-10Z"/>
+  <g font-family="Inter,system-ui,sans-serif" font-size="19" font-weight="600" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="6" stroke-linejoin="round" fill="#282b3b">
+    <text x="90" y="58.5" fill="#bf427e">Pt</text>
+    <text x="90" y="18">L</text>
+    <text x="90" y="99">L</text>
+    <text x="36" y="27">L</text>
+    <text x="144" y="27">L</text>
+    <text x="36" y="89">L</text>
+    <text x="144" y="89">L</text>
+  </g>
+</svg>

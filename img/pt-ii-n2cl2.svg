@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 117">
+  <g fill="none" stroke="#282b3b" stroke-width="1.8" stroke-linecap="round">
+    <path d="M21 34 71 84M21 84 71 34M109 34l50 50m-50 0 50-50"/>
+  </g>
+  <g font-family="Inter,system-ui,sans-serif" font-weight="600" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="4" stroke-linejoin="round" font-size="16">
+    <g fill="#bf427e" font-size="18">
+      <text x="46" y="59">Pt</text>
+      <text x="134" y="59">Pt</text>
+    </g>
+    <g fill="#233bcb">
+      <text x="21" y="34">N</text>
+      <text x="21" y="84">N</text>
+      <text x="109" y="34">N</text>
+      <text x="159" y="84">N</text>
+    </g>
+    <g fill="#238044">
+      <text x="71" y="34">Cl</text>
+      <text x="71" y="84">Cl</text>
+      <text x="159" y="34">Cl</text>
+      <text x="109" y="84">Cl</text>
+    </g>
+  </g>
+</svg>

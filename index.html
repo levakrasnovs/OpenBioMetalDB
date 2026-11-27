@@ -7,7 +7,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="img/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=53">
+<link rel="stylesheet" href="style.css?v=78">
 <script>try{const t=localStorage.getItem('obmd-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>
@@ -43,10 +43,44 @@
   </defs>
 </svg>
 <header class="top">
-  <a class="brand" href="#/"><img src="img/logo.svg" width="560" height="120" alt="OpenBioMetalDB"></a>
-  <div class="right">
-    <nav><a href="#/">Home</a><a href="#/compounds">Compounds</a><a href="#/compounds?has=efficacy">In vivo</a><a href="#/compounds?has=ic50">Cytotoxicity</a><a href="#/compounds?has=logp">Lipophilicity</a><a href="#/data">Download and cite</a></nav>
-    <button class="theme" id="theme" title="Theme">◐</button>
+  <a class="brand" href="#/" aria-label="OpenBioMetalDB">
+    <svg aria-hidden="true" focusable="false" width="560" height="120" viewBox="0 0 560 120">
+      <defs>
+        <linearGradient id="coordination" x1="0" y1="1" x2="1" y2="0">
+          <stop stop-color="#9b80ff"/>
+          <stop offset=".52" stop-color="#648cf8"/>
+          <stop offset="1" stop-color="#2cdfce"/>
+        </linearGradient>
+        <linearGradient id="wordmark" x1="0" x2="1">
+          <stop stop-color="#eae9ff"/>
+          <stop offset=".68" stop-color="#c8ddff"/>
+          <stop offset="1" stop-color="#67ecd7"/>
+        </linearGradient>
+      </defs>
+      <rect x="1" y="1" width="558" height="118" rx="17" fill="#0b0d17" stroke="#262b4a" stroke-width="2"/>
+      <g transform="translate(62 60)">
+        <circle r="43" fill="#121527" stroke="#262b4a" stroke-width="2"/>
+        <path d="M0-30 26-15v30L0 30l-26-15v-30Z" fill="none" stroke="#3d4673" stroke-width="2"/>
+        <path d="M0-30v60M-26-15l52 30m0-30-52 30" fill="none" stroke="url(#coordination)" stroke-width="3" stroke-linecap="round"/>
+        <g fill="#121527" stroke="url(#coordination)" stroke-width="2.8">
+          <circle cy="-30" r="4.5"/>
+          <circle cx="26" cy="-15" r="4.5"/>
+          <circle cx="26" cy="15" r="4.5"/>
+          <circle cy="30" r="4.5"/>
+          <circle cx="-26" cy="15" r="4.5"/>
+          <circle cx="-26" cy="-15" r="4.5"/>
+        </g>
+        <circle r="10" fill="url(#coordination)" stroke="#121527" stroke-width="2"/>
+      </g>
+      <text x="121" y="77" font-family="Inter, Helvetica Neue, Arial, sans-serif" font-size="51" font-weight="700" letter-spacing="-1.5" fill="url(#wordmark)">OpenBioMetal<tspan fill="#2cdfce">DB</tspan></text>
+    </svg>
+  </a>
+  <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Menu" aria-expanded="false" aria-controls="header-menu">
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <div class="right" id="header-menu">
+    <nav aria-label="Main navigation"><a href="#/">Home</a><a href="#/compounds">Compounds</a><a href="#/compounds?has=efficacy">In vivo</a><a href="#/compounds?has=ic50">Cytotoxicity</a><a href="#/compounds?has=logp">Lipophilicity</a><a href="#/data">Download and cite</a></nav>
+    <button type="button" class="theme" id="theme" aria-label="Switch theme"><span aria-hidden="true">◐</span><span class="theme-label">Switch theme</span></button>
   </div>
 </header>
 <main id="app"><p class="empty">Loading…</p></main>
@@ -58,6 +92,6 @@
   </nav>
 </footer>
 <div class="tip" id="tip"></div>
-<script src="app.js?v=114"></script>
+<script src="app.js?v=152"></script>
 </body>
 </html>

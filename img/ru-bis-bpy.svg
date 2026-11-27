@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 117">
+  <defs>
+    <g id="bpy">
+      <path d="M54 16 68.7 24.5v17L54 50l-14.7-8.5v-17ZM54 67l14.7 8.5v17L54 101l-14.7-8.5v-17ZM54 50v17"/>
+      <path d="M44 26l10-5.8M43 39.4l10 5.8M65.2 28v10M44 91l10 5.8M43 77.6l10-5.8M65.2 79v10"/>
+      <path d="M68.7 41.5 90 58.5 68.7 75.5"/>
+    </g>
+  </defs>
+  <g fill="none" stroke="#282b3b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#bpy"/>
+    <use href="#bpy" transform="translate(180 0) scale(-1 1)"/>
+    <path d="M90 22v73"/>
+  </g>
+  <g font-family="Inter,system-ui,sans-serif" font-weight="600" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="4" stroke-linejoin="round">
+    <text x="90" y="58.5" fill="#bf427e" font-size="18">Ru</text>
+    <g fill="#233bcb" font-size="14">
+      <text x="68.7" y="41.5">N</text>
+      <text x="68.7" y="75.5">N</text>
+      <text x="111.3" y="41.5">N</text>
+      <text x="111.3" y="75.5">N</text>
+    </g>
+    <g fill="#282b3b" font-size="16">
+      <text x="90" y="22">L</text>
+      <text x="90" y="95">L</text>
+    </g>
+  </g>
+</svg>
