@@ -190,7 +190,8 @@ nav a.on{color:var(--text)}
 .active-filter-chip:hover{filter:brightness(1.1)}
 .active-filter-chip>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .active-filter-chip>span[aria-hidden]{font-size:15px;line-height:1}
-.catalog-toolbar #freset{flex:none;min-height:28px;padding:4px 8px;font-size:12px;white-space:nowrap}
+.catalog-toolbar #freset{flex:none;min-height:28px;padding:4px 8px;font-size:12px;white-space:nowrap;background:var(--accent2);border-color:var(--accent2);color:#081619}
+.catalog-toolbar #freset:hover{filter:brightness(1.08)}
 .cat .picker{
   grid-column:1;
   grid-row:1 / span 2;
@@ -234,6 +235,8 @@ nav a.on{color:var(--text)}
 .chip.facet-empty:not(.on){opacity:.6}
 .chip:disabled{cursor:default}
 .counted-filter{display:grid;gap:5px}
+.physicochemical-filters{display:grid;gap:5px;margin-top:4px;padding-top:6px;border-top:1px solid var(--line)}
+.physicochemical-filters h3{font-weight:600}
 .counted-filter[hidden]{display:none}
 .counted-filter summary{display:flex;align-items:center;gap:9px;min-height:32px;padding:6px 10px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;font-size:13px;cursor:pointer;list-style:none}
 .counted-filter summary::-webkit-details-marker{display:none}

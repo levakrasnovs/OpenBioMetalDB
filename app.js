@@ -142,7 +142,7 @@ function card(c, o = {}) {
 const canonicalPaperDoi = doi => IDX.paper_aliases?.[doi.toLowerCase()] ?? doi;
 async function route() {
   hideTip();
-  if (!IDX) { IDX = await fetch('index.json?v=36').then(r => r.json()); IDX.compounds.forEach(c => BY[c.id] = c); PM = await fetch('paper_meta.json?v=2').then(r => r.json()).catch(() => ({})); }
+  if (!IDX) { IDX = await fetch('index.json?v=38').then(r => r.json()); IDX.compounds.forEach(c => BY[c.id] = c); PM = await fetch('paper_meta.json?v=2').then(r => r.json()).catch(() => ({})); }
   const h = location.hash.slice(1) || '/';
   const [encodedPath, qs] = h.split('?'); const path = decodeURIComponent(encodedPath); const q = new URLSearchParams(qs || '');
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + h));
@@ -344,6 +344,47 @@ const CS = { smi: '', mode: 'full', thr: .7, res: null };   // structure search 
 const OXIDATION_ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
 const NUCLEARITY_OPTIONS = [['1', 'Mononuclear'], ['2', 'Dinuclear'], ['3', 'Trinuclear'], ['4+', '4+ metal centers']];
 const METAL_COMPOSITION_OPTIONS = [['homo', 'Homonuclear'], ['hetero', 'Heteronuclear']];
+const WEIGHT_RANGES = [
+  ['under-300', '<300', 300],
+  ['300-500', '300–<500', 500],
+  ['500-650', '500–<650', 650],
+  ['650-800', '650–<800', 800],
+  ['800-1000', '800–<1,000', 1000],
+  ['1000-plus', '≥1,000', Infinity],
+];
+const LOGP_RANGES = [
+  ['under-minus-2', '<−2', -2],
+  ['minus-2-to-minus-1', '−2–<−1', -1],
+  ['minus-1-to-0', '−1–<0', 0],
+  ['0-1', '0–<1', 1],
+  ['1-2', '1–<2', 2],
+  ['2-3', '2–<3', 3],
+  ['3-plus', '≥3', Infinity],
+];
+const MELTING_POINT_RANGES = [
+  ['under-100', '<100', 100],
+  ['100-150', '100–<150', 150],
+  ['150-200', '150–<200', 200],
+  ['200-250', '200–<250', 250],
+  ['250-300', '250–<300', 300],
+  ['300-plus', '≥300', Infinity],
+];
+const IC50_RANGES = [
+  ['under-0.1', '<0.1', 0.1],
+  ['0.1-1', '0.1–<1', 1],
+  ['1-10', '1–<10', 10],
+  ['10-100', '10–<100', 100],
+  ['100-plus', '≥100', Infinity],
+];
+const NO_RANGE_DATA = ['no-data', 'No data'];
+const rangeOption = (value, ranges) => value === NO_RANGE_DATA[0] ? NO_RANGE_DATA : ranges.find(([id]) => id === value);
+const rangeFor = (value, ranges) => Number.isFinite(value) ? ranges.find(([, , upper]) => value < upper)[0] : '';
+const meltingRanges = intervals => MELTING_POINT_RANGES.filter(([, , upper], i) => {
+  const lower = i ? MELTING_POINT_RANGES[i - 1][2] : -Infinity;
+  return intervals.some(([from, to]) => to === null
+    ? upper === Infinity && from >= lower
+    : from < upper && to >= lower);
+}).map(([id]) => id);
 const formatCount = new Intl.NumberFormat('en');
 function catalog(q) {
   const C = IDX.compounds, LN = IDX.lines, ORG = IDX.organ;
@@ -363,6 +404,10 @@ function catalog(q) {
   const requestedMetal = q.get('metal');
   const requestedNuclearity = q.get('nuclearity');
   const requestedComposition = q.get('composition');
+  const requestedWeight = q.get('mw');
+  const requestedLogp = q.get('logp');
+  const requestedMelting = q.get('mp');
+  const requestedICRange = q.get('ic50');
   const metal = metalCounts.has(requestedMetal) ? requestedMetal : 'All';
   const scaffold = SCAFFOLDS.find(item => item.id === q.get('scaffold')
     && (metal === 'All' || metal === item.metal));
@@ -372,8 +417,13 @@ function catalog(q) {
     nuclearity: NUCLEARITY_OPTIONS.some(([value]) => value === requestedNuclearity) ? requestedNuclearity : '',
     composition: requestedNuclearity !== '1' && METAL_COMPOSITION_OPTIONS.some(([value]) => value === requestedComposition)
       ? requestedComposition : '',
+    weight: rangeOption(requestedWeight, WEIGHT_RANGES)?.[0] ?? '',
+    logp: rangeOption(requestedLogp, LOGP_RANGES)?.[0] ?? '',
+    melting: rangeOption(requestedMelting, MELTING_POINT_RANGES)?.[0] ?? '',
     has: new Set(requestedData.filter(k => Object.hasOwn(FILTER_KIND, k) || Object.hasOwn(CLINICAL_FILTERS, k))),
-    tissue: '', line: '', time: '', lo: null, hi: null };
+    tissue: '', line: '', time: '',
+    icRange: IC50_RANGES.some(([id]) => id === requestedICRange) ? requestedICRange : '',
+    lo: null, hi: null };
   const topMetals = ['All', ...[...metalCounts].sort((a, b) => b[1] - a[1]).slice(0, 9).map(([m]) => m)];
   const otherMetals = [...metalCounts.keys()].filter(m => !topMetals.includes(m)).sort();
   const countedFilter = (id, label, search = '') => `<div class="counted-filter" id="${id}">
@@ -433,7 +483,14 @@ function catalog(q) {
       ${countedFilter('ftis', 'Tissue')}
       ${countedFilter('fline', 'Cell line', '<input type="search" id="cell-line-search" placeholder="Search cell lines" aria-label="Search cell lines" autocomplete="off" spellcheck="false">')}
       ${countedFilter('ftime', 'Exposure time')}
+      ${countedFilter('ficrange', 'IC₅₀ range (µM)')}
       <div class="two"><input id="flo" type="number" min="0" step="any" placeholder="IC₅₀ min, µM" aria-label="Minimum IC₅₀ (µM)"><input id="fhi" type="number" min="0" step="any" placeholder="IC₅₀ max, µM" aria-label="Maximum IC₅₀ (µM)"></div>
+      <div class="physicochemical-filters" role="group" aria-labelledby="physicochemical-label">
+        <h3 class="flab" id="physicochemical-label">Physicochemical properties</h3>
+        ${countedFilter('fweight', 'Molecular weight (g/mol)')}
+        ${countedFilter('flogp', 'logP')}
+        ${countedFilter('fmelting', 'Melting point (°C)')}
+      </div>
       <label class="flab" for="sort">Sort</label>
       <select id="sort"><option value="sim">Most similar</option><option value="p">Most papers</option><option value="ic">Most cytotoxic</option><option value="icd">Least cytotoxic</option><option value="new">Newest first</option><option value="old">Oldest first</option><option value="tgi">Best TGI</option><option value="lp">logP</option><option value="id">OBMD ID</option></select>
       <button type="button" class="btn catalog-show-results" id="catalog-show-results">Show results</button>
@@ -451,6 +508,10 @@ function catalog(q) {
   const activeFilters = $('#active-filters');
   const filterToolbar = $('#catalog-toolbar');
   const renderActiveFilters = () => {
+    const activeWeight = rangeOption(st.weight, WEIGHT_RANGES);
+    const activeLogp = rangeOption(st.logp, LOGP_RANGES);
+    const activeMelting = rangeOption(st.melting, MELTING_POINT_RANGES);
+    const activeICRange = IC50_RANGES.find(([id]) => id === st.icRange);
     const chips = [
       ['q', st.q.trim() && `Search: ${st.q.trim()}`],
       ['structure', (CS.res || searchButton.disabled) && CS.smi && `Structure: ${CS.smi}`],
@@ -459,10 +520,14 @@ function catalog(q) {
       ['ox', st.ox && `${st.metal}(${OXIDATION_ROMAN[st.ox] ?? st.ox})`],
       ['nuclearity', NUCLEARITY_OPTIONS.find(([value]) => value === st.nuclearity)?.[1]],
       ['composition', METAL_COMPOSITION_OPTIONS.find(([value]) => value === st.composition)?.[1]],
+      ['weight', activeWeight && (activeWeight === NO_RANGE_DATA ? 'MW: No data' : `MW ${activeWeight[1]} g/mol`)],
+      ['logp', activeLogp && `logP ${activeLogp[1]}`],
+      ['melting', activeMelting && (activeMelting === NO_RANGE_DATA ? 'MP: No data' : `MP ${activeMelting[1]} °C`)],
       ...[...st.has].map(kind => [`data:${kind}`, CLINICAL_FILTERS[kind] ?? FILTER_KIND[kind], kind]),
       ['tissue', st.tissue],
       ['line', st.line !== '' && String(LN[st.line])],
       ['time', st.time && `${st.time} h`],
+      ['icRange', activeICRange && `IC₅₀ ${activeICRange[1]} µM`],
       ['lo', st.lo != null && `IC₅₀ ≥ ${st.lo} µM`],
       ['hi', st.hi != null && `IC₅₀ ≤ ${st.hi} µM`],
     ].filter(([, label]) => label);
@@ -478,8 +543,11 @@ function catalog(q) {
     filtersToggle.setAttribute('aria-expanded', 'false');
     filtersToggle.focus();
   };
-  const icFilter = () => st.tissue || st.line !== '' || st.time || st.lo != null || st.hi != null;
-  const icInRange = v => (st.lo == null || v >= st.lo) && (st.hi == null || v <= st.hi);
+  const manualICRange = () => st.lo != null || st.hi != null;
+  const icFilter = () => st.tissue || st.line !== '' || st.time || st.icRange || manualICRange();
+  const icInRange = (value, range) => st.icRange
+    ? st.icRange === (range ?? rangeFor(value, IC50_RANGES))
+    : (st.lo == null || value >= st.lo) && (st.hi == null || value <= st.hi);
   const icOk = ([l, t, v]) => (!st.tissue || ORG[LN[l]] === st.tissue) && (st.line === '' || l === +st.line) && (!st.time || String(t) === st.time) && icInRange(v);
   const hasData = (c, k) => {
     if (k === 'approved') return APPROVAL_KINDS.some(k => c.clinical?.[k]);
@@ -493,33 +561,55 @@ function catalog(q) {
   const scaffoldButtons = [...scaffoldList.querySelectorAll('[data-scaffold]')];
   const scaffoldToggle = $('#scaffold-toggle');
   const addCount = (counts, key) => counts.set(key, (counts.get(key) || 0) + 1);
-  const setOptions = (filter, options, counts, selected, visible = options) => {
-    const optionContent = (value, label) =>
-      `<span>${esc(label)}</span><span class="facet-count">${formatCount.format(counts.get(value) || 0)}</span>`;
-    const current = options.find(([value]) => value === selected) ?? options[0];
-    filter.querySelector('summary .counted-option').innerHTML = optionContent(...current);
+  const addRangeCount = (counts, range) => {
+    addCount(counts, '');
+    if (range) {
+      addCount(counts, 'covered');
+      addCount(counts, range);
+    }
+  };
+  const setOptions = (filter, options, counts, selected, visible = options, summaryBadge) => {
+    const optionContent = (value, label, badge = formatCount.format(counts.get(value) || 0)) =>
+      `<span>${esc(label)}</span><span class="facet-count">${esc(badge)}</span>`;
+    const [value, label] = options.find(([value]) => value === selected) ?? options[0];
+    filter.querySelector('summary .counted-option').innerHTML = optionContent(value, label, summaryBadge);
     filter.querySelector('.counted-options').innerHTML = visible.map(([value, label]) =>
       `<button type="button" class="counted-option" data-value="${esc(value)}" aria-pressed="${value === selected}">${optionContent(value, label)}</button>`).join('')
       || '<p class="counted-empty" role="status">No matching cell lines</p>';
+  };
+  const setRangeOptions = (filter, ranges, counts, selected) => {
+    const covered = counts.get('covered') || 0;
+    const summaryBadge = selected ? undefined : `${formatCount.format(covered)} in ranges`;
+    counts.set(NO_RANGE_DATA[0], (counts.get('') || 0) - covered);
+    setOptions(filter, [['', 'No filter'], ...ranges, NO_RANGE_DATA], counts, selected, undefined, summaryBadge);
   };
   const setChipCount = (button, count) => {
     button.querySelector('.facet-count').textContent = formatCount.format(count);
     button.classList.toggle('facet-empty', count === 0);
   };
   const countCytotoxicity = (measurements, counts) => {
-    const tissues = new Set(), lines = new Set(), times = new Set();
-    if (st.lo == null && st.hi == null) {
+    const tissues = new Set(), lines = new Set(), times = new Set(), intervals = new Set();
+    if (!st.tissue && st.line === '' && !st.time) intervals.add('');
+    if (!st.icRange && !manualICRange()) {
       // Clearing the last cytotoxicity condition also admits compounds with no IC₅₀ values.
       if (!st.time && (st.tissue || st.line === '')) tissues.add('');
       if (!st.tissue && !st.time) lines.add('');
       if (!st.tissue && st.line === '') times.add('');
     }
     for (const [line, time, value] of measurements) {
-      if (!icInRange(value)) continue;
       const tissue = ORG[LN[line]];
       const tissueOK = !st.tissue || tissue === st.tissue;
       const lineOK = st.line === '' || line === +st.line;
-      if (!st.time || String(time) === st.time) {
+      const timeOK = !st.time || String(time) === st.time;
+      const sameAssay = tissueOK && lineOK && timeOK;
+      const interval = sameAssay || st.icRange ? rangeFor(value, IC50_RANGES) : undefined;
+      if (sameAssay) {
+        // Selecting an interval replaces any preset or manual limits.
+        intervals.add('');
+        if (interval) intervals.add(interval);
+      }
+      if (!icInRange(value, interval)) continue;
+      if (timeOK) {
         // Changing tissue clears the cell line, while keeping the same tissue preserves it.
         if (tissue && (tissue !== st.tissue || lineOK)) tissues.add(tissue);
         if (st.tissue || lineOK) tissues.add('');
@@ -536,11 +626,12 @@ function catalog(q) {
     for (const tissue of tissues) addCount(counts.tissue, tissue);
     for (const line of lines) addCount(counts.line, line);
     for (const time of times) addCount(counts.time, time);
+    for (const interval of intervals) addCount(counts.icRange, interval);
   };
   const lineFilter = $('#fline');
   const lineSearch = $('#cell-line-search');
   const compactLineName = name => name.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-  const renderCytotoxicity = ({tissue, line, time}) => {
+  const renderCytotoxicity = ({tissue, line, time, icRange}, resultCount) => {
     const values = (counts, selected) => [...new Set([...counts.keys(), selected])].filter(Boolean);
     const byCount = (counts, a, b) => (counts.get(b) || 0) - (counts.get(a) || 0);
     const tissues = values(tissue, st.tissue).sort((a, b) => byCount(tissue, a, b) || a.localeCompare(b, 'en'))
@@ -566,6 +657,13 @@ function catalog(q) {
       .map(value => [value, `${value} h`]);
     setOptions($('#ftis'), [['', 'All tissues'], ...tissues], tissue, st.tissue);
     setOptions($('#ftime'), [['', 'All exposure times'], ...times], time, st.time);
+    const intervalOptions = [['', 'No IC₅₀ range'], ...IC50_RANGES];
+    if (manualICRange()) {
+      icRange.set('custom', resultCount);
+      setOptions($('#ficrange'), [['custom', 'Custom range'], ...intervalOptions], icRange, 'custom', intervalOptions);
+    } else {
+      setOptions($('#ficrange'), intervalOptions, icRange, st.icRange);
+    }
   };
   const renderScaffolds = counts => {
     const countFor = button => counts.get(button.dataset.scaffold) || 0;
@@ -599,8 +697,9 @@ function catalog(q) {
     const paperIds = t.startsWith('10.') ? new Set(IDX.papers[canonicalPaperDoi(t)] || []) : null;
     const scaffoldMetal = SCAFFOLDS.find(item => item.id === st.scaffold)?.metal;
     const metals = new Map(), nuclearity = new Map(), composition = new Map(), oxidation = new Map();
+    const weights = new Map(), logpValues = new Map(), meltingPoints = new Map();
     const scaffolds = new Map();
-    const cytotoxicity = { tissue: new Map(), line: new Map(), time: new Map() };
+    const cytotoxicity = { tissue: new Map(), line: new Map(), time: new Map(), icRange: new Map() };
     const bestIC = new Map(), rows = [];
     for (const c of C) {
       if (R && !R.ids.has(c.id)) continue;
@@ -614,13 +713,31 @@ function catalog(q) {
       const oxOK = !st.ox || st.ox === state;
       const nucleiOK = !st.nuclearity || st.nuclearity === nuclei;
       const compositionOK = !st.composition || c.heteronuclear === (st.composition === 'hetero');
+      const weightRange = rangeFor(c.mw, WEIGHT_RANGES);
+      const logpRange = rangeFor(c.lp, LOGP_RANGES);
+      const meltingRangeIds = c.mp_intervals ? meltingRanges(c.mp_intervals) : [];
+      const weightOK = !st.weight || st.weight === (weightRange || NO_RANGE_DATA[0]);
+      const logpOK = !st.logp || st.logp === (logpRange || NO_RANGE_DATA[0]);
+      const meltingOK = !st.melting || (st.melting === NO_RANGE_DATA[0]
+        ? !meltingRangeIds.length : meltingRangeIds.includes(st.melting));
+      const otherFacetsOK = metalOK && scaffoldOK && oxOK && nucleiOK && compositionOK;
 
-      if (metalOK && scaffoldOK && oxOK && nucleiOK && compositionOK) countCytotoxicity(c.ics, cytotoxicity);
+      if (otherFacetsOK && weightOK && logpOK && meltingOK) countCytotoxicity(c.ics, cytotoxicity);
       if (F) {
         const values = c.ics.filter(icOk).map(([, , value]) => value);
         if (!values.length) continue;
         bestIC.set(c.id, Math.min(...values));
       }
+      if (otherFacetsOK) {
+        if (logpOK && meltingOK) addRangeCount(weights, weightRange);
+        if (weightOK && meltingOK) addRangeCount(logpValues, logpRange);
+        if (weightOK && logpOK) {
+          addCount(meltingPoints, '');
+          if (meltingRangeIds.length) addCount(meltingPoints, 'covered');
+          for (const id of meltingRangeIds) addCount(meltingPoints, id);
+        }
+      }
+      if (!weightOK || !logpOK || !meltingOK) continue;
       if (nucleiOK && compositionOK) {
         if (scaffoldOK) addCount(metals, 'All');
         for (const element of new Set(elements)) {
@@ -661,8 +778,11 @@ function catalog(q) {
     const compositionSelect = $('#fcomposition');
     compositionSelect.hidden = st.nuclearity === '1';
     setOptions(compositionSelect, [['', 'All compositions'], ...METAL_COMPOSITION_OPTIONS], composition, st.composition);
+    setRangeOptions($('#fweight'), WEIGHT_RANGES, weights, st.weight);
+    setRangeOptions($('#flogp'), LOGP_RANGES, logpValues, st.logp);
+    setRangeOptions($('#fmelting'), MELTING_POINT_RANGES, meltingPoints, st.melting);
     renderScaffolds(scaffolds);
-    renderCytotoxicity(cytotoxicity);
+    renderCytotoxicity(cytotoxicity, rows.length);
     const options = oxOptions(st.metal);
     const oxSelect = $('#fox');
     oxSelect.hidden = !options.length;
@@ -736,6 +856,10 @@ function catalog(q) {
     if (st.ox) params.set('ox', st.ox); else params.delete('ox');
     if (st.nuclearity) params.set('nuclearity', st.nuclearity); else params.delete('nuclearity');
     if (st.composition) params.set('composition', st.composition); else params.delete('composition');
+    if (st.weight) params.set('mw', st.weight); else params.delete('mw');
+    if (st.logp) params.set('logp', st.logp); else params.delete('logp');
+    if (st.melting) params.set('mp', st.melting); else params.delete('mp');
+    if (st.icRange) params.set('ic50', st.icRange); else params.delete('ic50');
     if (st.scaffold) params.set('scaffold', st.scaffold); else params.delete('scaffold');
     const query = params.toString();
     history.replaceState(history.state, '', `#/compounds${query ? '?' + query : ''}`);
@@ -785,7 +909,8 @@ function catalog(q) {
   const catalogPage = app.querySelector('.page');
   for (const [id, key] of [
     ['fox', 'ox'], ['fnuclearity', 'nuclearity'], ['fcomposition', 'composition'],
-    ['ftis', 'tissue'], ['fline', 'line'], ['ftime', 'time'],
+    ['fweight', 'weight'], ['flogp', 'logp'], ['fmelting', 'melting'],
+    ['ftis', 'tissue'], ['fline', 'line'], ['ftime', 'time'], ['ficrange', 'icRange'],
   ]) {
     const dropdown = $(`#${id} details`);
     const summary = dropdown.querySelector('summary');
@@ -794,6 +919,10 @@ function catalog(q) {
       if (!option) return;
       const value = option.dataset.value;
       if (key === 'tissue' && value !== st.tissue) st.line = '';
+      if (key === 'icRange') {
+        st.lo = st.hi = null;
+        $('#flo').value = $('#fhi').value = '';
+      }
       st[key] = value;
       if (st.nuclearity === '1') st.composition = '';
       summary.focus();
@@ -833,7 +962,7 @@ function catalog(q) {
         lineSearch.focus();
         return;
       }
-      const next = index < 0 ? options.find(option => option.getAttribute('aria-pressed') === 'true')
+      const next = index < 0 ? options.find(option => option.getAttribute('aria-pressed') === 'true') ?? options[0]
         : options[(index + direction + options.length) % options.length];
       next?.focus();
     };
@@ -848,8 +977,17 @@ function catalog(q) {
     shown = 60;
     render();
   };
-  $('#flo').oninput = e => { st.lo = e.target.value === '' ? null : +e.target.value; shown = 60; render(); };
-  $('#fhi').oninput = e => { st.hi = e.target.value === '' ? null : +e.target.value; shown = 60; render(); };
+  for (const [id, key] of [['flo', 'lo'], ['fhi', 'hi']]) {
+    $(`#${id}`).oninput = e => {
+      st[key] = e.target.value === '' ? null : +e.target.value;
+      if (st.icRange) {
+        st.icRange = '';
+        updateCatalogUrl();
+      }
+      shown = 60;
+      render();
+    };
+  }
   activeFilters.onclick = event => {
     const button = event.target.closest('[data-remove-filter]');
     if (!button) return;
