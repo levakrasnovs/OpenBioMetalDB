@@ -5,7 +5,13 @@ const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS,
 const fmt = (v, d = 1) => v == null || v === '' || isNaN(+v) ? (v ?? '–') : (+v).toFixed(d).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const doi = d => `<a href="#/paper/${encodeURIComponent(d)}">${esc(d)}</a>`;
-const extUrl = d => d.startsWith('pmid_') ? 'https://pubmed.ncbi.nlm.nih.gov/' + d.slice(5) + '/' : 'https://doi.org/' + d;
+const extUrl = d => {
+  const sourceUrl = PM[d]?.url;
+  if (typeof sourceUrl === 'string' && sourceUrl.startsWith('https://')) return sourceUrl;
+  if (d.startsWith('pmid_')) return 'https://pubmed.ncbi.nlm.nih.gov/' + d.slice(5) + '/';
+  if (d.startsWith('urn:nbn:')) return 'https://nbn-resolving.org/' + d;
+  return 'https://doi.org/' + d;
+};
 const doiExt = d => `<a href="${esc(extUrl(d))}" target="_blank" rel="noopener">${esc(extUrl(d))}</a>`;
 const ccdcLink = code => `<a class="saltchip" href="https://www.ccdc.cam.ac.uk/structures/Search?Ccdcid=${encodeURIComponent(code)}&amp;DatabaseToSearch=Published" target="_blank" rel="noopener">${esc(code)}</a>`;
 const tip = $('#tip');
@@ -653,7 +659,7 @@ function clinicalDetails({ fda, drugbank, trials, max_phase, regional_approvals 
         ? ` · ${t.id ? '' : 'Started '}<time datetime="${esc(t.start_year)}" title="Study start year">${esc(t.start_year)}</time>`
         : t.publication_year ? ` · Published <time datetime="${esc(t.publication_year)}">${esc(t.publication_year)}</time>` : ''}
         ${t.start_year_url ? `<a class="clinical-context" href="${esc(t.start_year_url)}" target="_blank" rel="noopener">Start year source</a>` : ''}
-        <span>${esc(['Phase ' + t.phase, t.completion_year ? `Completed in ${t.completion_year}` : t.status, t.role].filter(Boolean).join(' · '))}</span>
+        <span>${esc([t.phase ? `Phase ${t.phase}` : '', t.completion_year ? `Completed in ${t.completion_year}` : t.status, t.role].filter(Boolean).join(' · '))}</span>
         ${t.protocol_phase ? `<span>Overall protocol: Phase ${esc(t.protocol_phase)}${t.phase_url ? ` · <a href="${esc(t.phase_url)}" target="_blank" rel="noopener">Cohort design</a>` : ''}</span>` : ''}
         ${t.enrollment_update ? `<span>${esc(t.enrollment_update)}${t.enrollment_url ? ` <a href="${esc(t.enrollment_url)}" target="_blank" rel="noopener">Sponsor update</a>` : ''}</span>` : ''}
         ${t.randomized_participants ? `<span>${esc(t.randomized_participants.toLocaleString('en'))} participants randomized${t.analyzed_participants ? ` · ${esc(t.analyzed_participants.toLocaleString('en'))} analyzed` : ''}</span>` : ''}
@@ -691,7 +697,8 @@ async function compoundPage(id, controlId) {
         <dt>Formula (ion)</dt><dd>${ionFormula(c.f)}</dd>
         <dt>Molecular weight</dt><dd>${Number.isFinite(c.molecular_weight) ? `${c.molecular_weight.toFixed(2)} g/mol` : '–'}</dd>
         ${c.iso ? `<dt>Isomer</dt><dd>${esc(c.iso)}</dd>` : ''}
-        <dt>Salt forms</dt><dd>${c.salts.length ? c.salts.slice(0, 6).map(x => `<span class="saltchip">${esc(x)}</span>`).join('') : '<span class="muted">neutral or not stated</span>'}</dd>
+        <dt>${c.related_salts?.length ? 'Counterion' : 'Salt forms'}</dt><dd>${c.salts.length ? c.salts.slice(0, 6).map(x => `<span class="saltchip">${esc(x)}</span>`).join('') : '<span class="muted">neutral or not stated</span>'}</dd>
+        ${c.related_salts?.length ? `<dt>Related salt</dt><dd>${c.related_salts.map(salt => `<a class="saltchip" href="#/c/${encodeURIComponent(salt.id)}">${esc(salt.name)}</a>`).join('')}</dd>` : ''}
         <dt>SMILES</dt><dd>${c.smi ? `<code class="smi">${esc(c.smi)}</code><button class="copy" data-copy="${esc(c.smi)}" style="margin-top:6px">copy SMILES</button>` : '<span class="muted">no structure in the source</span>'}</dd>
         ${c.ccdc?.length ? `<dt>CCDC</dt><dd>${c.ccdc.map(ccdcLink).join('')}</dd>` : ''}
         <dt>Data</dt><dd><div class="pills">${COMPOUND_DATA_ORDER.map(kind => {
@@ -723,7 +730,7 @@ async function compoundPage(id, controlId) {
     ${paperCount > 1 ? `<div class="record-controls"><label>Sort by <select id="literatureSort">
       <option value="newest">Newest first</option><option value="oldest">Oldest first</option>
     </select></label></div>` : ''}
-    <div class="lit"></div>
+    <div class="lit" tabindex="0" role="region" aria-label="Papers"></div>
   </section>
   </div>`;
   bindSectionNavigation(app);
@@ -1070,6 +1077,8 @@ function cisplatinComparison(comparison) {
   return `<div class="ic-comparison"><span aria-hidden="true">↳</span> <a href="${controlHref(comparison)}">Cisplatin</a> · ${esc(comparison.value)} µM</div>`;
 }
 const lpNumber = value => fmt(value, 4).replace(/^-/, '−');
+const LP_MIN = -4, LP_MAX = 4;
+const lpOffScale = value => value < LP_MIN || value > LP_MAX;
 const lpLimit = r => ['<', '>', '≤', '≥'].includes(r.value_relation);
 const lpValue = r => {
   const relation = r.value_relation === '=' ? '' : r.value_relation ?? '';
@@ -1081,7 +1090,8 @@ const lpConditions = r => [r.pH != null && `pH ${r.pH}`, r.temperature_C != null
 function lpPointDetails(r) {
   return measurementDetails({
     result: [r.type_authors, lpValue(r)].filter(Boolean).join(' '),
-    conditions: [r.paperCompound && studyName(r), r.aqueous_phase, lpConditions(r)].filter(Boolean).join(' · '),
+    conditions: [r.paperCompound && studyName(r), r.aqueous_phase, lpConditions(r),
+      lpOffScale(r.value) && 'Outside the plotted range'].filter(Boolean).join(' · '),
     method: [r.method, r.detection].filter(Boolean).join(' · '),
     counterion: r.counterion, doi: r.doi, year: r.year,
   });
@@ -1091,16 +1101,9 @@ function lpPlot(rows) {
   const points = rows.filter(({ r }) => Number.isFinite(r.value)).sort((a, b) => a.r.value - b.r.value);
   if (!points.length) return '';
   const interval = r => Number.isFinite(r.std) && !lpLimit(r) ? r.std : 0;
-  const min = Math.min(...points.map(({ r }) => r.value - interval(r)));
-  const max = Math.max(...points.map(({ r }) => r.value + interval(r)));
-  const pad = (max - min || 1) * .1;
-  const lo = min - pad, hi = max + pad;
-  const pos = v => 100 * (v - lo) / (hi - lo);
-  const power = 10 ** Math.floor(Math.log10((hi - lo) / 5));
-  const step = [1, 2, 5, 10].map(k => k * power).find(s => s >= (hi - lo) / 5);
-  const ticks = [];
-  for (let i = Math.ceil(lo / step); i <= Math.floor(hi / step); i++) ticks.push(i * step);
-  const axis = ticks.map(t => `<span class="lp-tick${t === 0 ? ' lp-zero' : ''}" style="--x:${pos(t)}%">${lpNumber(t)}</span>`).join('');
+  const pos = value => 100 * (Math.max(LP_MIN, Math.min(LP_MAX, value)) - LP_MIN) / (LP_MAX - LP_MIN);
+  const ticks = [LP_MIN, -2, 0, 2, LP_MAX];
+  const axis = ticks.map(t => `<span class="lp-tick${t === 0 ? ' lp-zero' : ''}" style="--x:${pos(t)}%">${t > 0 ? '+' : ''}${lpNumber(t)}</span>`).join('');
 
   // Keep the reported x position. Offset nearby points vertically so each can be inspected.
   const lanes = [];
@@ -1113,14 +1116,19 @@ function lpPlot(rows) {
   });
   const marks = positioned.map(({ r, i, x, lane }) => {
     const y = (lane - (lanes.length - 1) / 2) * 18;
-    const direction = r.value_relation === '<' || r.value_relation === '≤' ? '←' : '→';
+    const offScale = lpOffScale(r.value);
+    const symbol = offScale ? (r.value < LP_MIN ? '‹' : '›') :
+      lpLimit(r) ? (r.value_relation === '<' || r.value_relation === '≤' ? '←' : '→') : '';
     const error = interval(r);
-    return `${error ? `<i class="lp-error" style="--x:${pos(r.value - error)}%;--end:${pos(r.value + error)}%;--y:${y}px" aria-hidden="true"></i>` : ''}
-      <button type="button" class="lp-mark${lpLimit(r) ? ' lp-limit' : ''}" style="--x:${x}%;--y:${y}px" data-lp-point="${i}" aria-label="${esc(lpPointDetails(r).join(', '))}">${lpLimit(r) ? `<span aria-hidden="true">${direction}</span>` : ''}</button>`;
+    const start = r.value - error, end = r.value + error;
+    const caps = `${start < LP_MIN ? ' lp-error-no-start' : ''}${end > LP_MAX ? ' lp-error-no-end' : ''}`;
+    return `${pos(start) < pos(end) ? `<i class="lp-error${caps}" style="--x:${pos(start)}%;--end:${pos(end)}%;--y:${y}px" aria-hidden="true"></i>` : ''}
+      <button type="button" class="lp-mark${symbol ? ' lp-limit' : ''}${offScale ? ' lp-offscale' : ''}" style="--x:${x}%;--y:${y}px" data-lp-point="${i}" aria-label="${esc(lpPointDetails(r).join(', '))}">${symbol ? `<span aria-hidden="true">${symbol}</span>` : ''}</button>`;
   }).join('');
-  return `<div class="lp-plot" role="group" aria-label="Experimental lipophilicity">
+  return `<div class="lp-plot" role="group" aria-label="Experimental lipophilicity on a scale from −4 to +4">
     <div class="lp-strip" style="--height:${Math.max(42, lanes.length * 18 + 12)}px">${marks}</div>
     <div class="lp-axis" aria-hidden="true">${axis}</div>
+    ${points.some(({ r }) => lpOffScale(r.value)) ? '<p class="lp-scale-note">‹ and › mark values outside the plotted range.</p>' : ''}
   </div>`;
 }
 
@@ -1324,7 +1332,8 @@ function showEff(c) {
     ['baseline_volume_mm3', 'Treated baseline volume (mm³)'], ['control_baseline_volume_mm3', 'Control baseline volume (mm³)'],
     ['result_tumor_weight_g', 'Treated tumour weight (g)'], ['control_tumor_weight_g', 'Control tumour weight (g)'],
     ['TGI_volume_delta', 'TGI by volume change (%)'],
-    ['reference_drug', 'Reference drug'], ['reference_dose_mg_kg', 'Reference dose (mg/kg)'],
+    ['reference_drug', 'Reference drug'], ['reference_SMILES_Complex', 'Reference SMILES'],
+    ['reference_dose_mg_kg', 'Reference dose (mg/kg)'],
     ['reference_TGI_volume', 'Reference TGI by volume (%)'], ['reference_TGI_weight', 'Reference TGI by weight (%)'],
     ['max_weight_loss_pct', 'Maximum weight loss (%)'], ['drug_related_deaths', 'Drug-related deaths'],
     ['Light_wavelength_nm', 'Wavelength (nm)'], ['Light_dose_J_cm2', 'Light dose (J/cm²)'], ['Light_power_mW', 'Light power (mW)'],
@@ -1334,7 +1343,6 @@ function showEff(c) {
     const visible = entries.filter(entry => selects.every(s => !s.value || entry[s.dataset.filter] === s.value));
     const status = $('[role="status"]', controls);
     if (status) status.textContent = `${visible.length} of ${entries.length} experiments`;
-    table.classList.toggle('study-table-scroll', visible.length > 12);
     table.scrollTop = 0;
     if (!visible.length) {
       table.innerHTML = '<p class="study-empty">No experiments match these filters.</p>';
@@ -1510,9 +1518,13 @@ function showOrgans(c) {
     Object.entries(nodes).forEach(([k, n]) => n.classList.toggle('sel', k === o));
     const rs = o ? by[o] || [] : rows;
     $('#orgTable').innerHTML = `<table><tr>${showCompound ? '<th>Compound</th>' : ''}<th>Organ</th><th>Parameter</th><th>Dose / route</th><th>Outcome</th><th>DOI</th></tr>` +
-      rs.map(r => `<tr>${showCompound ? `<td>${studyNameCell(r)}</td>` : ''}<td>${esc(r.Organ)}</td><td>${esc(r.Parameter ?? r.Method ?? '–')}</td><td>${esc(studyDose(r))}</td><td class="o-${esc(r.Outcome)}">${esc(r.Outcome?.replaceAll('_', ' ') ?? '–')}</td><td>${r.DOI ? doi(r.DOI) : '–'}</td></tr>`).join('') + '</table>';
+      rs.map(r => `<tr>${showCompound ? `<td>${studyNameCell(r)}</td>` : ''}<td>${esc(r.Organ)}</td><td>${esc(r.Parameter ?? r.Method ?? '–')}${organStudyNotes(r)}</td><td>${esc(studyDose(r))}${r.Treatment_arm ? `<small>${esc(r.Treatment_arm)}</small>` : ''}</td><td class="o-${esc(r.Outcome)}">${esc(r.Outcome?.replaceAll('_', ' ') ?? '–')}</td><td>${r.DOI ? doi(r.DOI) : '–'}</td></tr>`).join('') + '</table>';
   }
   table(null);
+}
+
+function organStudyNotes(row) {
+  return row.Notes ? `<details><summary>Study notes</summary><small>${esc(row.Notes)}</small></details>` : '';
 }
 
 function studyDose(row) {
@@ -1527,13 +1539,12 @@ function showBiomarkers(c) {
   const table = $('#biomarkerTable');
   const showOutcome = rows.some(row => row.Outcome);
   const headers = ['Biomarker', 'Sample / organ', 'Treatment', 'Treated', 'Control', 'Unit', 'Dose / route', 'Day', ...(showOutcome ? ['Outcome'] : []), 'DOI'];
-  table.classList.toggle('study-table-scroll', rows.length > 12);
   table.innerHTML = `<table aria-label="Safety biomarkers measurements"><thead><tr>
     ${headers.map(header => `<th scope="col">${header}</th>`).join('')}
   </tr></thead><tbody>${rows.map(r => `<tr>
     <td>${esc(r.Parameter ?? '–')}${r.Method ? `<small>${esc(r.Method.replaceAll('_', ' '))}</small>` : ''}</td>
     <td>${esc(r.Organ ?? '–')}</td>
-    <td>${studyNameCell(r)}${r.Species ? `<small>${esc(r.Species)}</small>` : ''}</td>
+    <td>${studyNameCell(r)}${r.Species ? `<small>${esc(r.Species)}</small>` : ''}${r.Treatment_arm ? `<small>${esc(r.Treatment_arm)}</small>` : ''}${organStudyNotes(r)}</td>
     <td class="study-result">${esc(r.value_treated ?? '–')}</td>
     <td class="study-result">${esc(r.value_control ?? '–')}</td>
     <td>${esc(r.Unit ?? '–')}</td>
@@ -1547,6 +1558,9 @@ function showBiomarkers(c) {
 function renderStudyTable(table, name, headings, records) {
   const prefix = table.id.replace(/Table$/, '');
   const headers = [...headings, 'Protocol'];
+  table.tabIndex = 0;
+  table.setAttribute('role', 'region');
+  table.setAttribute('aria-label', name);
   table.innerHTML = `<table aria-label="${esc(name)}"><thead><tr>${headers.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead>
     <tbody>${records.map(({ cells, facts, comparison = '' }, i) => {
       const id = `${prefix}-details-${i}`;
@@ -1578,6 +1592,7 @@ function showTox(c) {
     ['survival_pct', 'Survival (%)'], ['max_weight_loss_pct', 'Maximum weight loss (%)'],
     ['Group_size', 'Group size'], ['Sex', 'Sex'], ['Age', 'Age'], ['Body_weight_range_g', 'Body weight (g)'],
     ['Vehicle', 'Vehicle'], ['Fasted', 'Fasted'], ['LD50_calculation_method', `${LD50} calculation method`],
+    ['Notes', 'Source notes'],
   ];
   const records = c.toxicity.map(t => ({
     cells: [
@@ -1591,7 +1606,7 @@ function showTox(c) {
     ],
     facts: fields.map(([key, title]) => [title, key === 'Fasted' ? (({ TRUE: 'Yes', FALSE: 'No' })[t[key]] ?? t[key]) : t[key]]),
   }));
-  renderStudyTable($('#toxTable'), 'Acute toxicity experiments',
+  renderStudyTable($('#toxTable'), 'Toxicity experiments',
     [`${LD50}, mg/kg`, 'MTD, mg/kg', 'Label in article', 'Animals', 'Route', 'Dosing', 'Source'], records);
 }
 
@@ -1600,7 +1615,8 @@ function showPK(c) {
   if (!c.pk.length) return;
   const endpoints = [
     ['t_half_h', 't½', 'h'], ['Tmax_h', 'T<sub>max</sub>', 'h'], ['Cmax_ug_mL', 'C<sub>max</sub>', 'µg/mL'],
-    ['AUC_0_t_ug_h_mL', 'AUC<sub>0–t</sub>', 'µg·h/mL'], ['AUC_0_inf_ug_h_mL', 'AUC<sub>0–∞</sub>', 'µg·h/mL'],
+    ['AUC_0_t_ug_h_mL', 'Interval AUC', 'µg·h/mL'], ['AUC_0_inf_ug_h_mL', 'AUC<sub>0–∞</sub>', 'µg·h/mL'],
+    ['F_pct', 'Absolute bioavailability', '%'],
   ].filter(([key]) => c.pk.some(p => p[key] != null));
   const quantity = (value, unit) => value == null ? null : [value, unit].filter(v => v != null && v !== '').join(' ');
   const records = c.pk.map(p => {
@@ -1620,6 +1636,7 @@ function showPK(c) {
         ['Formulation', p.Formulation], ['Dosing', p.Dosing], ['Counterion', p.Counterion],
         ['Group size', p.Group_size], ['Sex', p.Sex],
         ['Tumour bearing', ({ TRUE: 'Yes', FALSE: 'No' })[p.Tumor_bearing] ?? p.Tumor_bearing],
+        ['Source notes', p.Notes],
       ],
     };
   });
@@ -1702,7 +1719,6 @@ function showSurv(c) {
     const visible = entries.filter(entry => (!model || model === entry.model) &&
       (!kind || entry.results.some(result => result.kind === kind)));
     $('[role="status"]', controls).textContent = `${visible.length} of ${entries.length} records`;
-    table.classList.toggle('study-table-scroll', visible.length > 12);
     table.scrollTop = 0;
     if (!visible.length) {
       table.innerHTML = '<p class="study-empty">No survival records match these filters.</p>';
